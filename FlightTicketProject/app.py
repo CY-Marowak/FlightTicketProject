@@ -1,4 +1,5 @@
-﻿from flask import Flask, request, jsonify
+﻿#寫好地點以及日期 輸出前5 跳過"unavailable"
+from flask import Flask, request, jsonify
 import requests
 
 app = Flask(__name__)
@@ -41,7 +42,7 @@ def get_price():
     try:
         top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
 
-        if not top_flights:  # ✅ 沒有航班
+        if not top_flights:  # 沒有航班
             return jsonify({
                 "from": departure_id,
                 "to": arrival_id,
@@ -51,7 +52,9 @@ def get_price():
             })
 
         flights = []
-        for f in top_flights[:5]:  # 只取前 5 筆
+        for f in top_flights:  # 取全部來看 跳過unavailable
+            if f["price"] == "unavailable":
+                continue
             flights.append({
                 "airline": f["flights"][0]["airline"],
                 "flight_number": f["flights"][0]["flight_number"],
@@ -60,12 +63,17 @@ def get_price():
                 "price": f["price"]
             })
 
+        # 按票價排序，取前5便宜的航班
+        flights.sort(key=lambda x: x["price"])
+        cheapest_flights = flights[:5]
+
+
         return jsonify({
             "from": departure_id,
             "to": arrival_id,
             "outbound_date": outbound_date,
             "return_date": return_date,
-            "flights": flights
+            "flights": cheapest_flights
         })
     except Exception as e:
         return jsonify({
