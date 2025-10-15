@@ -89,7 +89,7 @@ def get_price():
                 "flight_number": f["flights"][0]["flight_number"],
                 "depart_time": f["flights"][0]["departure_airport"]["time"],
                 "arrival_time": f["flights"][0]["arrival_airport"]["time"],
-                "price": f["price"]
+                "price": float(f["price"])
             }
             flights.append(flight_info)
 
