@@ -1,87 +1,44 @@
 ﻿from flask import Flask, request, jsonify
-from apscheduler.schedulers.background import BackgroundScheduler
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 import requests
-import atexit
 
 app = Flask(__name__)
 
+# ====== RapidAPI 設定 ======
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
 RAPIDAPI_KEY = "c2e285b6f4msh6a1da4d7047fb58p1f5b65jsn96fa996ffe3c"
 
-# 上次航班
-lsat_flight = None
-# 用來暫存上次查到的最低價
-last_price = None  
+# ====== SQLite 設定 ======
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///flights.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
 
-def check_flight_price():
-    """定期執行的任務：查詢航班票價並檢查是否有變化"""
-    global last_price
 
-    url = f"https://{RAPIDAPI_HOST}/api/v1/searchFlights"
-    headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": RAPIDAPI_HOST
-    }
-    query = {
-        "departure_id": "TPE",
-        "arrival_id": "OKA",
-        "outbound_date": "2026-03-12",
-        "return_date": "2026-03-15",
-        "adults": "1",
-        "currency": "TWD"
-    }
+# ====== 資料表定義 ======
+class Flight(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    from_airport = db.Column(db.String(10))
+    to_airport = db.Column(db.String(10))
+    outbound_date = db.Column(db.String(20))
+    return_date = db.Column(db.String(20))
+    airline = db.Column(db.String(100))
+    flight_number = db.Column(db.String(20))
+    depart_time = db.Column(db.String(50))
+    arrival_time = db.Column(db.String(50))
+    price = db.Column(db.Float)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
 
-    try:
-        response = requests.get(url, headers=headers, params=query)
-        if response.status_code != 200:
-            print(f"❌ API 錯誤 ({response.status_code}): {response.text}")
-            return
 
-        data = response.json()
-        flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
+# ====== 初始化資料庫 ======
+with app.app_context():
+    db.create_all()
 
-        flight = []
-        for f in flights:
-            if(f["price"] == "unavailable"):
-                continue
-            flight.append({ 
-                "price": float(f["price"]) ,
-                "airline": f["flights"][0]["airline"]
-            })
-        
-        if not flight:
-            print("⚠️ 沒有找到可用票價")
-            return
 
-        cheapest = min(flight, key=lambda x: x["price"])
-        
-        if last_price is None:
-            last_price = cheapest['price']
-            last_flight = cheapest['airline']
-            print(f"航班號碼：{last_flight} ") #初次航班
-            print(f"📡 初次查詢票價：{last_price} TWD")
-        elif cheapest['price'] != last_price:
-            print(f"航班號碼：{cheapest['airline']} ")
-            print(f"💰 票價變動！之前 {last_price} → 現在 {cheapest['price']} TWD")
-            last_price = cheapest['price']
-        else:
-            print(f"✅ 票價無變化：{cheapest['price']} TWD")
-
-    except Exception as e:
-        print(f"⚠️ 排程任務發生錯誤: {e}")
-
-# 啟動 Flask 時同步啟動背景排程
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=check_flight_price, trigger="interval", seconds=10) #多久呼叫一次
-scheduler.start()
-atexit.register(lambda: scheduler.shutdown())
-
-#找出當日所有航班 印出前5便宜的航班
-#此功能之後可以給使用者選擇要追蹤的航班
+# ====== API: 查詢航班票價 ======
 @app.route("/price", methods=["GET"])
 def get_price():
-    """即時查票價（與你原本的一樣）"""
-    departure_id = request.args.get("from", "TPE")
+    departure_id = request. args.get("from", "TPE")
     arrival_id = request.args.get("to", "OKA")
     outbound_date = request.args.get("depart", "2026-03-12")
     return_date = request.args.get("return", "2026-03-15")
@@ -110,31 +67,98 @@ def get_price():
         }), 400
 
     data = response.json()
-    top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
 
-    flights = [] 
-    for f in top_flights: # 取全部來看 跳過unavailable 
-        if f["price"] == "unavailable": 
-            continue 
-        flights.append({ 
-            "airline": f["flights"][0]["airline"], 
-            "flight_number": f["flights"][0]["flight_number"], 
-            "depart_time": f["flights"][0]["departure_airport"]["time"], 
-            "arrival_time": f["flights"][0]["arrival_airport"]["time"], 
-            "price": f["price"] 
+    try:
+        top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
+
+        if not top_flights:
+            return jsonify({
+                "from": departure_id,
+                "to": arrival_id,
+                "outbound_date": outbound_date,
+                "return_date": return_date,
+                "message": "查無符合的航班資料"
+            })
+
+        flights = []
+        for f in top_flights:
+            if f["price"] == "unavailable": # 取全部來看 跳過unavailable 
+                continue
+            flight_info = {
+                "airline": f["flights"][0]["airline"],
+                "flight_number": f["flights"][0]["flight_number"],
+                "depart_time": f["flights"][0]["departure_airport"]["time"],
+                "arrival_time": f["flights"][0]["arrival_airport"]["time"],
+                "price": f["price"]
+            }
+            flights.append(flight_info)
+
+            # --- 儲存進資料庫 ---
+            existing = Flight.query.filter_by(
+                from_airport=departure_id,
+                to_airport=arrival_id,
+                outbound_date=outbound_date,
+                return_date=return_date,
+                flight_number=flight_info["flight_number"]
+            ).first()
+
+            if existing:
+                existing.price = flight_info["price"]
+                existing.last_updated = datetime.utcnow()
+            else:
+                new_flight = Flight(
+                    from_airport=departure_id,
+                    to_airport=arrival_id,
+                    outbound_date=outbound_date,
+                    return_date=return_date,
+                    airline=flight_info["airline"],
+                    flight_number=flight_info["flight_number"],
+                    depart_time=flight_info["depart_time"],
+                    arrival_time=flight_info["arrival_time"],
+                    price=flight_info["price"]
+                )
+                db.session.add(new_flight)
+
+        db.session.commit()
+
+        # --- 取前 5 便宜的航班 ---
+        flights.sort(key=lambda x: x["price"])
+        cheapest_flights = flights[:5]
+
+        return jsonify({
+            "from": departure_id,
+            "to": arrival_id,
+            "outbound_date": outbound_date,
+            "return_date": return_date,
+            "flights": cheapest_flights,
+            "count_saved": len(cheapest_flights)
+        })
+    except Exception as e:
+        return jsonify({
+            "error": "無法解析航班資料",
+            "details": str(e),
+            "raw": data
         })
 
-    flights.sort(key=lambda x: x["price"])
-    cheapest_flights = flights[:5]
 
-    return jsonify({
-        "from": departure_id,
-        "to": arrival_id,
-        "outbound_date": outbound_date,
-        "return_date": return_date,
-        "flights": cheapest_flights
-    })
+# ====== 查詢資料庫歷史記錄 ======
+@app.route("/history", methods=["GET"])
+def get_history():
+    flights = Flight.query.order_by(Flight.last_updated.desc()).limit(20).all()
+    result = []
+    for f in flights:
+        result.append({
+            "from": f.from_airport,
+            "to": f.to_airport,
+            "airline": f.airline,
+            "flight_number": f.flight_number,
+            "depart_time": f.depart_time,
+            "arrival_time": f.arrival_time,
+            "price": f.price,
+            "updated": f.last_updated.strftime("%Y-%m-%d %H:%M:%S")
+        })
+    return jsonify(result)
+
 
 if __name__ == "__main__":
-    print("🚀 Flask 啟動中，背景排程已開始執行...")
     app.run(debug=True)
