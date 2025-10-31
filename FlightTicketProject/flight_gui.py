@@ -56,10 +56,10 @@ class FlightApp(QWidget):
         self.setLayout(layout)
 
     def search_flights(self):
-        depart = self.input_from.text().strip() or "TPE"
-        dest = self.input_to.text().strip() or "OKA"
-        depart_date = self.input_depart.text().strip() or "2026-03-12"
-        return_date = self.input_return.text().strip() or "2026-03-15"
+        depart = self.input_from.text().strip()
+        dest = self.input_to.text().strip()
+        depart_date = self.input_depart.text().strip()
+        return_date = self.input_return.text().strip()
 
         params = {
             "from": depart,

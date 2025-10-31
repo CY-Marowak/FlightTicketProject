@@ -38,10 +38,10 @@ with app.app_context():
 # ====== API: 查詢航班票價 ======
 @app.route("/price", methods=["GET"])
 def get_price():
-    departure_id = request. args.get("from", "TPE")
-    arrival_id = request.args.get("to", "OKA")
-    outbound_date = request.args.get("depart", "2026-03-12")
-    return_date = request.args.get("return", "2026-03-15")
+    departure_id = request. args.get("from")
+    arrival_id = request.args.get("to")
+    outbound_date = request.args.get("depart")
+    return_date = request.args.get("return")
 
     url = f"https://{RAPIDAPI_HOST}/api/v1/searchFlights"
     headers = {
