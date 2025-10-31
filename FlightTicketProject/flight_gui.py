@@ -2,12 +2,13 @@
 import requests
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QMessageBox, QSystemTrayIcon
+    QPushButton, QTextEdit, QMessageBox, QSystemTrayIcon, QMenu, QAction
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
 API_URL = "http://127.0.0.1:5000/price"  # 你的 Flask 後端 API
+ICON_PATH = "plane.png"  # 請確認有這張圖
 
 
 class FlightApp(QWidget):
@@ -15,10 +16,19 @@ class FlightApp(QWidget):
         super().__init__()
         self.setWindowTitle("航班票價查詢系統 ✈️")
         self.setGeometry(500, 200, 600, 400)
+        self.setWindowIcon(QIcon(ICON_PATH))  # 視窗左上角icon
 
-        # === 新增系統通知圖示 ===
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon())  # 這裡可以放一個 icon.png
+        # === 系統匣通知 ===
+        self.tray_icon = QSystemTrayIcon(QIcon(ICON_PATH), self)
+        self.tray_icon.setToolTip("航班票價查詢系統 ✈️")
+
+        # 加入右鍵功能選單（例如退出）
+        tray_menu = QMenu()
+        quit_action = QAction("結束應用程式", self)
+        quit_action.triggered.connect(QApplication.quit)
+        tray_menu.addAction(quit_action)
+
+        self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
 
         self.init_ui()
@@ -56,10 +66,10 @@ class FlightApp(QWidget):
         self.setLayout(layout)
 
     def search_flights(self):
-        depart = self.input_from.text().strip()
-        dest = self.input_to.text().strip()
-        depart_date = self.input_depart.text().strip()
-        return_date = self.input_return.text().strip()
+        depart = self.input_from.text().strip() or "TPE"
+        dest = self.input_to.text().strip() or "OKA"
+        depart_date = self.input_depart.text().strip() or "2026-03-12"
+        return_date = self.input_return.text().strip() or "2026-03-15"
 
         params = {
             "from": depart,
@@ -94,10 +104,10 @@ class FlightApp(QWidget):
 
             self.result_box.setText(output)
 
-            # ✅ 使用 Qt 系統通知（不會報錯）
+            # ✅ 顯示系統通知（有icon）
             cheapest = flights[0]
             msg = f"{cheapest['airline']} 最低票價 {cheapest['price']} 元"
-            self.tray_icon.showMessage("查詢成功", msg, QSystemTrayIcon.Information, 5000)
+            self.tray_icon.showMessage("查詢成功 ✈️", msg, QSystemTrayIcon.Information, 5000)
 
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"查詢過程中發生錯誤：{str(e)}")
