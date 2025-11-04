@@ -1,4 +1,7 @@
 # TEMP
+curl可以使用的方式:<br>
+curl.exe --% -X POST http://127.0.0.1:5000/flights -H "Content-Type: application/json" -d "{\"from\":\"TPE\",\"to\":\"OKA\",\"depart\":\"2026-03-12\",\"return\":\"2026-03-15\"}"
+<br>
 目前程式的問題在於他把要找的整個時段裡面的每個Flights都加入追蹤 <br>
 但我希望是找一個時間段後 <br>
 讓使用者選擇要加入哪一台Flight來追蹤 <br>
