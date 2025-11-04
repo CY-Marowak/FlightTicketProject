@@ -5,6 +5,7 @@ from datetime import datetime
 
 
 app = Flask(__name__)
+app.json.ensure_ascii = False #解決中文被轉成uni的問題
 
 
 # ===== RapidAPI 設定 =====
