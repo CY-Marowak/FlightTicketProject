@@ -1,3 +1,9 @@
+# TEMP
+目前程式的問題在於他把要找的整個時段裡面的每個Flights都加入追蹤 <br>
+但我希望是找一個時間段後 <br>
+讓使用者選擇要加入哪一台Flight來追蹤 <br>
+
+
 # Overview
 ## 已完成
 1. 後端資料提取 (Python+flask)
@@ -130,7 +136,7 @@ notifications	id, flight_id, message, notify_time	通知紀錄
 
 讓後端每 30 分鐘自動執行一次：
 
-# 用 APScheduler
+### 用 APScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -155,18 +161,3 @@ PyQt5 前端定期（例如每 1 分鐘）檢查通知紀錄表 → 顯示通知
 顯示：
 | 時間 | 航班 | 價格 | 通知內容 |
 
-✅ 建議你現在開始的步驟：
-
-👉 從第 1 步「建立資料庫」開始
-我可以幫你直接寫出：
-
-建立 SQLite 資料庫的初始化程式
-
-Flask 後端新增/刪除/查詢航班的 API
-
-之後 PyQt5 前端就能直接連接這些 API 了。
-
-要我幫你先寫出：
-
-✅ SQLite + Flask 的資料庫初始化 + CRUD API（我的航班管理）
-嗎？
