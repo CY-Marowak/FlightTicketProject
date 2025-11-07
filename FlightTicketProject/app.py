@@ -3,60 +3,35 @@ import requests
 import sqlite3
 from datetime import datetime
 
-
 app = Flask(__name__)
 app.json.ensure_ascii = False #解決中文被轉成uni的問題
 
 
-# ===== RapidAPI 設定 =====
+# === RapidAPI 設定 ===
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
 RAPIDAPI_KEY = "c2e285b6f4msh6a1da4d7047fb58p1f5b65jsn96fa996ffe3c"
 
-# ===== 建立 / 連接資料庫 =====
+# === 初始化 SQLite ===
 DB_NAME = "flights.db"
-
 def init_db():
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-
-    # 使用者追蹤的航班
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS flights (
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS tracked_flights (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            from_code TEXT NOT NULL,
-            to_code TEXT NOT NULL,
-            depart_date TEXT NOT NULL,
-            return_date TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            from_airport TEXT,
+            to_airport TEXT,
+            flight_number TEXT,
+            airline TEXT,
+            depart_time TEXT,
+            arrival_time TEXT,
+            price REAL
         )
     """)
-
-    # 價格紀錄（之後折線圖會用到）
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS prices (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            flight_id INTEGER,
-            checked_time TEXT,
-            price INTEGER,
-            FOREIGN KEY(flight_id) REFERENCES flights(id)
-        )
-    """)
-
-    # 通知紀錄（之後通知頁會用）
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            flight_id INTEGER,
-            message TEXT,
-            notify_time TEXT,
-            FOREIGN KEY(flight_id) REFERENCES flights(id)
-        )
-    """)
-
     conn.commit()
     conn.close()
 
-# ===== 查詢航班票價 =====
+# === 查詢航班 ===
 @app.route("/price", methods=["GET"])
 def get_price():
     departure_id = request.args.get("from")
@@ -89,17 +64,29 @@ def get_price():
     data = response.json()
     try:
         top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
+        if not top_flights:
+            return jsonify({
+                "from": departure_id,
+                "to": arrival_id,
+                "outbound_date": outbound_date,
+                "return_date": return_date,
+                "message": "查無符合的航班資料"
+            })
+
         flights = []
         for f in top_flights:
-            if f["price"] == "unavailable":# 取全部來看 跳過unavailable 
+            if f["price"] == "unavailable": # 取全部來看 跳過unavailable 
                 continue
             flights.append({
+                "from": departure_id,
+                "to": arrival_id,
                 "airline": f["flights"][0]["airline"],
                 "flight_number": f["flights"][0]["flight_number"],
                 "depart_time": f["flights"][0]["departure_airport"]["time"],
                 "arrival_time": f["flights"][0]["arrival_airport"]["time"],
                 "price": float(f["price"])
             })
+
         flights.sort(key=lambda x: x["price"])
         cheapest_flights = flights[:5]
 
@@ -110,69 +97,79 @@ def get_price():
             "return_date": return_date,
             "flights": cheapest_flights
         })
+
     except Exception as e:
         return jsonify({
             "error": "無法解析航班資料",
             "details": str(e),
             "raw": data
-        })
+        }), 500
 
-# ===== 我的航班管理 =====
-
+# === 加入追蹤 ===
 @app.route("/flights", methods=["POST"])
 def add_flight():
     data = request.get_json()
-    from_code = data.get("from")
-    to_code = data.get("to")
-    depart = data.get("depart")
-    ret = data.get("return")
+    if not data:
+        return jsonify({"error": "缺少航班資料"}), 400
 
-    if not (from_code and to_code and depart):
-        return jsonify({"error": "缺少必要欄位"}), 400
+    required_fields = ["from", "to", "flight_number", "airline", "depart_time", "arrival_time", "price"]
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"缺少必要欄位：{field}"}), 400
 
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO flights (from_code, to_code, depart_date, return_date) VALUES (?, ?, ?, ?)",
-                   (from_code, to_code, depart, ret))
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO tracked_flights (from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["from"],
+        data["to"],
+        data["flight_number"],
+        data["airline"],
+        data["depart_time"],
+        data["arrival_time"],
+        data["price"]
+    ))
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "成功加入追蹤航班"})
+    return jsonify({"message": f"已成功加入追蹤航班 {data['flight_number']}"}), 200
 
-
+# === 查詢目前追蹤中的航班 ===
 @app.route("/flights", methods=["GET"])
-def get_all_flights():
+def get_tracked_flights():
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, from_code, to_code, depart_date, return_date, created_at FROM flights")
-    rows = cursor.fetchall()
+    c = conn.cursor()
+    c.execute("SELECT * FROM tracked_flights")
+    rows = c.fetchall()
     conn.close()
 
-    flights = [
-        {
-            "id": r[0],
-            "from": r[1],
-            "to": r[2],
-            "depart": r[3],
-            "return": r[4],
-            "created_at": r[5]
-        } for r in rows
-    ]
-
+    flights = []
+    for row in rows:
+        flights.append({
+            "id": row[0],
+            "from": row[1],
+            "to": row[2],
+            "flight_number": row[3],
+            "airline": row[4],
+            "depart_time": row[5],
+            "arrival_time": row[6],
+            "price": row[7]
+        })
     return jsonify(flights)
 
-
+# === 刪除追蹤中的航班 ===
 @app.route("/flights/<int:flight_id>", methods=["DELETE"])
 def delete_flight(flight_id):
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM flights WHERE id = ?", (flight_id,))
+    c = conn.cursor()
+    c.execute("DELETE FROM tracked_flights WHERE id = ?", (flight_id,))
     conn.commit()
     conn.close()
-    return jsonify({"message": "已刪除航班"})
+    return jsonify({"message": f"已刪除追蹤航班 ID {flight_id}"}), 200
 
-
-# ===== 主程式 =====
+# === 主程式啟動 ===
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)

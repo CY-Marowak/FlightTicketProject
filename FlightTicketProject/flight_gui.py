@@ -1,116 +1,190 @@
 ﻿import sys
 import requests
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QMessageBox, QSystemTrayIcon, QMenu, QAction
+    QApplication, QWidget, QVBoxLayout, QLabel, QPushButton,
+    QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox,
+    QHeaderView, QTabWidget, QHBoxLayout
 )
-from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 
-API_URL = "http://127.0.0.1:5000/price"  # 你的 Flask 後端 API
-ICON_PATH = "plane.png"  # 請確認有這張圖
-
+ICON_PATH = "plane.png"
 
 class FlightApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("航班票價查詢系統 ✈️")
-        self.setGeometry(500, 200, 600, 400)
-        self.setWindowIcon(QIcon(ICON_PATH))  # 視窗左上角icon
+        self.setWindowTitle("航班查詢與追蹤系統")
+        self.setGeometry(200, 200, 900, 600)
+        self.setWindowIcon(QIcon(ICON_PATH))  # 可自行替換icon
 
-        # === 系統匣通知 ===
-        self.tray_icon = QSystemTrayIcon(QIcon(ICON_PATH), self)
-        self.tray_icon.setToolTip("航班票價查詢系統 ✈️")
+        # --- 主分頁 ---
+        self.tabs = QTabWidget()
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.tabs)
+        self.setLayout(self.layout)
 
-        # 加入右鍵功能選單（例如退出）
-        tray_menu = QMenu()
-        quit_action = QAction("結束應用程式", self)
-        quit_action.triggered.connect(QApplication.quit)
-        tray_menu.addAction(quit_action)
+        # === 分頁1：查詢航班 ===
+        self.query_tab = QWidget()
+        self.tabs.addTab(self.query_tab, "查詢航班")
+        self.init_query_tab()
 
-        self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.show()
+        # === 分頁2：我的航班 ===
+        self.tracked_tab = QWidget()
+        self.tabs.addTab(self.tracked_tab, "我的航班")
+        self.init_tracked_tab()
 
-        self.init_ui()
-
-    def init_ui(self):
+    # -------------------------------------------------
+    # 查詢航班分頁
+    # -------------------------------------------------
+    def init_query_tab(self):
         layout = QVBoxLayout()
 
-        self.label_info = QLabel("輸入航班資訊：")
-        layout.addWidget(self.label_info)
+        layout.addWidget(QLabel("出發機場代碼 (e.g. TPE):"))
+        self.from_input = QLineEdit("TPE")
+        layout.addWidget(self.from_input)
 
-        self.input_from = QLineEdit()
-        self.input_from.setPlaceholderText("出發地（如：TPE）")
-        layout.addWidget(self.input_from)
+        layout.addWidget(QLabel("抵達機場代碼 (e.g. OKA):"))
+        self.to_input = QLineEdit("OKA")
+        layout.addWidget(self.to_input)
 
-        self.input_to = QLineEdit()
-        self.input_to.setPlaceholderText("目的地（如：OKA）")
-        layout.addWidget(self.input_to)
+        layout.addWidget(QLabel("出發日期 (YYYY-MM-DD):"))
+        self.depart_input = QLineEdit("2026-03-12")
+        layout.addWidget(self.depart_input)
 
-        self.input_depart = QLineEdit()
-        self.input_depart.setPlaceholderText("出發日期（格式：YYYY-MM-DD）")
-        layout.addWidget(self.input_depart)
+        layout.addWidget(QLabel("回程日期 (YYYY-MM-DD):"))
+        self.return_input = QLineEdit("2026-03-15")
+        layout.addWidget(self.return_input)
 
-        self.input_return = QLineEdit()
-        self.input_return.setPlaceholderText("回程日期（格式：YYYY-MM-DD）")
-        layout.addWidget(self.input_return)
+        # 查詢按鈕
+        self.search_btn = QPushButton("查詢航班")
+        self.search_btn.clicked.connect(self.search_flights)
+        layout.addWidget(self.search_btn)
 
-        self.btn_search = QPushButton("查詢票價")
-        self.btn_search.clicked.connect(self.search_flights)
-        layout.addWidget(self.btn_search)
+        # 查詢結果表格
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["航空公司", "航班編號", "出發時間", "抵達時間", "票價 (TWD)", "操作"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.table)
 
-        self.result_box = QTextEdit()
-        self.result_box.setReadOnly(True)
-        layout.addWidget(self.result_box)
+        self.query_tab.setLayout(layout)
 
-        self.setLayout(layout)
+    # -------------------------------------------------
+    # 我的航班分頁
+    # -------------------------------------------------
+    def init_tracked_tab(self):
+        layout = QVBoxLayout()
 
+        self.refresh_btn = QPushButton("重新整理追蹤清單")
+        self.refresh_btn.clicked.connect(self.load_tracked_flights)
+        layout.addWidget(self.refresh_btn)
+
+        self.tracked_table = QTableWidget()
+        self.tracked_table.setColumnCount(7)
+        self.tracked_table.setHorizontalHeaderLabels([
+            "航空公司", "航班編號", "出發時間", "抵達時間", "票價 (TWD)", "出發地", "操作"
+        ])
+        self.tracked_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.tracked_table)
+
+        self.tracked_tab.setLayout(layout)
+
+    # -------------------------------------------------
+    # 查詢航班（呼叫 Flask /price）
+    # -------------------------------------------------
     def search_flights(self):
-        depart = self.input_from.text().strip() or "TPE"
-        dest = self.input_to.text().strip() or "OKA"
-        depart_date = self.input_depart.text().strip() or "2026-03-12"
-        return_date = self.input_return.text().strip() or "2026-03-15"
+        from_airport = self.from_input.text().strip()
+        to_airport = self.to_input.text().strip()
+        depart_date = self.depart_input.text().strip()
+        return_date = self.return_input.text().strip()
 
-        params = {
-            "from": depart,
-            "to": dest,
-            "depart": depart_date,
-            "return": return_date
-        }
+        url = f"http://127.0.0.1:5000/price?from={from_airport}&to={to_airport}&depart={depart_date}&return={return_date}"
 
         try:
-            res = requests.get(API_URL, params=params, timeout=30)
-            if res.status_code != 200:
-                QMessageBox.warning(self, "API錯誤", f"查詢失敗：{res.text}")
-                return
+            response = requests.get(url)
+            data = response.json()
 
-            data = res.json()
             if "flights" not in data or not data["flights"]:
-                QMessageBox.information(self, "查無航班", "目前查無可用航班或票價。")
+                QMessageBox.warning(self, "查詢結果", "查無航班或API連線錯誤")
                 return
 
-            flights = data["flights"]
-            output = f"✈️ {depart} → {dest}\n出發日: {depart_date} 回程日: {return_date}\n\n"
-
-            for f in flights:
-                output += (
-                    f"航空公司: {f['airline']}\n"
-                    f"航班號: {f['flight_number']}\n"
-                    f"出發時間: {f['depart_time']}\n"
-                    f"抵達時間: {f['arrival_time']}\n"
-                    f"票價: {f['price']} TWD\n"
-                    f"{'-'*30}\n"
-                )
-
-            self.result_box.setText(output)
-
-            # ✅ 顯示系統通知（有icon）
-            cheapest = flights[0]
-            msg = f"{cheapest['airline']} 最低票價 {cheapest['price']} 元"
-            self.tray_icon.showMessage("查詢成功 ✈️", msg, QSystemTrayIcon.Information, 5000)
+            self.display_flights(data["flights"])
 
         except Exception as e:
-            QMessageBox.critical(self, "錯誤", f"查詢過程中發生錯誤：{str(e)}")
+            QMessageBox.critical(self, "錯誤", f"查詢失敗: {e}")
+
+    def display_flights(self, flights):
+        self.table.setRowCount(len(flights))
+        for i, flight in enumerate(flights):
+            self.table.setItem(i, 0, QTableWidgetItem(flight["airline"]))
+            self.table.setItem(i, 1, QTableWidgetItem(flight["flight_number"]))
+            self.table.setItem(i, 2, QTableWidgetItem(flight["depart_time"]))
+            self.table.setItem(i, 3, QTableWidgetItem(flight["arrival_time"]))
+            self.table.setItem(i, 4, QTableWidgetItem(str(flight["price"])))
+
+            btn = QPushButton("加入追蹤")
+            btn.clicked.connect(lambda _, f=flight: self.add_to_tracking(f))
+            self.table.setCellWidget(i, 5, btn)
+
+    # -------------------------------------------------
+    # 加入追蹤（POST /flights）
+    # -------------------------------------------------
+    def add_to_tracking(self, flight):
+        url = "http://127.0.0.1:5000/flights"
+        try:
+            response = requests.post(url, json=flight)
+            data = response.json()
+            if response.status_code == 200:
+                QMessageBox.information(self, "成功", data.get("message", "已加入追蹤"))
+            else:
+                QMessageBox.warning(self, "失敗", data.get("error", "加入追蹤失敗"))
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法加入追蹤: {e}")
+
+    # -------------------------------------------------
+    # 載入追蹤中的航班（GET /flights）
+    # -------------------------------------------------
+    def load_tracked_flights(self):
+        url = "http://127.0.0.1:5000/flights"
+        try:
+            response = requests.get(url)
+            data = response.json()
+
+            if not data:
+                QMessageBox.information(self, "提示", "目前沒有追蹤中的航班")
+                return
+
+            self.tracked_table.setRowCount(len(data))
+            for i, f in enumerate(data):
+                self.tracked_table.setItem(i, 0, QTableWidgetItem(f["airline"]))
+                self.tracked_table.setItem(i, 1, QTableWidgetItem(f["flight_number"]))
+                self.tracked_table.setItem(i, 2, QTableWidgetItem(f["depart_time"]))
+                self.tracked_table.setItem(i, 3, QTableWidgetItem(f["arrival_time"]))
+                self.tracked_table.setItem(i, 4, QTableWidgetItem(str(f["price"])))
+                self.tracked_table.setItem(i, 5, QTableWidgetItem(f["from"]))
+
+                del_btn = QPushButton("刪除")
+                del_btn.clicked.connect(lambda _, fid=f["id"]: self.delete_flight(fid))
+                self.tracked_table.setCellWidget(i, 6, del_btn)
+
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法載入追蹤清單: {e}")
+
+    # -------------------------------------------------
+    # 刪除航班（DELETE /flights/<id>）
+    # -------------------------------------------------
+    def delete_flight(self, flight_id):
+        url = f"http://127.0.0.1:5000/flights/{flight_id}"
+        try:
+            response = requests.delete(url)
+            data = response.json()
+            if response.status_code == 200:
+                QMessageBox.information(self, "成功", data.get("message", "已刪除航班"))
+                self.load_tracked_flights()
+            else:
+                QMessageBox.warning(self, "失敗", data.get("error", "刪除失敗"))
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法刪除航班: {e}")
 
 
 if __name__ == "__main__":
