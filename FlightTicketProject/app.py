@@ -159,6 +159,21 @@ def get_tracked_flights():
         })
     return jsonify(flights)
 
+@app.route("/prices/<int:flight_id>", methods=["GET"])
+def get_price_history(flight_id):
+    conn = sqlite3.connect("flights.db")
+    c = conn.cursor()
+    c.execute("SELECT checked_time, price FROM prices WHERE flight_id = ? ORDER BY checked_time ASC", (flight_id,))
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        return jsonify({"message": "尚無此航班的歷史票價資料"}), 404
+
+    data = [{"time": r[0], "price": r[1]} for r in rows]
+    return jsonify(data)
+
+
 # === 刪除追蹤中的航班 ===
 @app.route("/flights/<int:flight_id>", methods=["DELETE"])
 def delete_flight(flight_id):
