@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
+from matplotlib import pyplot as plt
 
 ICON_PATH = "plane.png"
 
@@ -163,9 +164,21 @@ class FlightApp(QWidget):
                 self.tracked_table.setItem(i, 4, QTableWidgetItem(str(f["price"])))
                 self.tracked_table.setItem(i, 5, QTableWidgetItem(f["from"]))
 
+                # 刪除按鈕
+                btn_layout = QHBoxLayout()
+                btn_layout.setAlignment(Qt.AlignCenter)
+
                 del_btn = QPushButton("刪除")
                 del_btn.clicked.connect(lambda _, fid=f["id"]: self.delete_flight(fid))
-                self.tracked_table.setCellWidget(i, 6, del_btn)
+                btn_layout.addWidget(del_btn)
+
+                chart_btn = QPushButton("折線圖")
+                chart_btn.clicked.connect(lambda _, fid=f["id"], fn=f["flight_number"]: self.show_price_chart(fid, fn))
+                btn_layout.addWidget(chart_btn)
+
+                cell_widget = QWidget()
+                cell_widget.setLayout(btn_layout)
+                self.tracked_table.setCellWidget(i, 6, cell_widget)
 
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"無法載入追蹤清單: {e}")
@@ -185,6 +198,35 @@ class FlightApp(QWidget):
                 QMessageBox.warning(self, "失敗", data.get("error", "刪除失敗"))
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"無法刪除航班: {e}")
+
+    # 
+    # -------------------------------------------------
+    # 加上顯示圖表
+    # -------------------------------------------------
+    def show_price_chart(self, flight_id, flight_number):
+        url = f"http://127.0.0.1:5000/prices/{flight_id}"
+        try:
+            response = requests.get(url)
+            if response.status_code != 200:
+                QMessageBox.warning(self, "提示", "此航班目前沒有票價紀錄")
+                return
+
+            data = response.json()
+            times = [d["time"] for d in data]
+            prices = [d["price"] for d in data]
+
+            plt.figure(figsize=(7, 4))
+            plt.plot(times, prices, marker='o', linestyle='-', linewidth=2)
+            plt.title(f"票價變化圖 - {flight_number}")
+            plt.xlabel("查詢時間")
+            plt.ylabel("票價 (TWD)")
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.grid(True)
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法顯示折線圖: {e}")
 
 
 if __name__ == "__main__":
