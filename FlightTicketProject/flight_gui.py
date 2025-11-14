@@ -1,5 +1,7 @@
 ﻿import sys
 import requests
+import socketio
+from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton,
     QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox,
@@ -9,11 +11,19 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
 
+
 ICON_PATH = "plane.png"
 
 class FlightApp(QWidget):
     def __init__(self):
         super().__init__()
+
+        self.sio = socketio.Client()
+        # 連線到後端 SocketIO
+        self.sio.connect("http://127.0.0.1:5000")
+        # 註冊事件
+        self.sio.on("price_alert", self.handle_price_alert)
+        
         self.setWindowTitle("航班查詢與追蹤系統")
         self.setGeometry(200, 200, 900, 600)
         self.setWindowIcon(QIcon(ICON_PATH))  # 可自行替換icon
@@ -33,6 +43,20 @@ class FlightApp(QWidget):
         self.tracked_tab = QWidget()
         self.tabs.addTab(self.tracked_tab, "我的航班")
         self.init_tracked_tab()
+
+    # -------------------------------------------------
+    # 自動在桌面跳出通知
+    # -------------------------------------------------
+    def handle_price_alert(self, data):
+        flight_no = data.get("flight_number")
+        price = data.get("price")
+
+        # 在桌面彈出通知
+        notification.notify(
+            title="票價新低通知",
+            message=f"{flight_no} 出現新低價：{price} TWD",
+            timeout=5
+        )
 
     # -------------------------------------------------
     # 查詢航班分頁
