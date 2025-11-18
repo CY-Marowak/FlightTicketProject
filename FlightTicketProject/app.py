@@ -4,8 +4,15 @@ from flask_socketio import SocketIO, emit
 import os
 import requests
 import sqlite3
-from datetime import datetime
+import bcrypt
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
+
+# 新增 JWT Secret Key
+JWT_SECRET = "SILVER_BULLET"
+JWT_EXPIRE_MINUTES = 10080  # 7 天
 
 app = Flask(__name__)
 app.json.ensure_ascii = False #解決中文被轉成uni的問題
@@ -19,6 +26,22 @@ RAPIDAPI_KEY = "c2e285b6f4msh6a1da4d7047fb58p1f5b65jsn96fa996ffe3c"
 
 # === 初始化 SQLite ===
 DB_NAME = "flights.db"
+# === 建立 users 表格 ===
+def init_user_table():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            created_at TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# === 建立 trackflights 表格 ===
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -37,18 +60,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-'''def check_db():
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-
-    cur.execute("PRAGMA table_info(notifications);")
-    columns = cur.fetchall()
-
-    for c in columns:
-        print(c)
-
-    conn.close()
-'''
 # === 建立 notifications 表格 ===
 def init_notification_table():
     conn = sqlite3.connect(DB_NAME)
@@ -79,7 +90,6 @@ def init_scheduler_log_table():
     conn.commit()
     conn.close()
 
-
 # === 建立 prices 表格 ===
 def init_price_table():
     conn = sqlite3.connect(DB_NAME)
@@ -96,7 +106,101 @@ def init_price_table():
     conn.commit()
     conn.close()
 
-# === 查詢排程結果記錄 ===
+    from functools import wraps
+
+
+# === 建立 token 驗證 (所有 API 加上登入保護) ===
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "缺少或無效的 token"}), 401
+
+        token = auth_header.split(" ")[1]
+
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            request.user_id = payload["user_id"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token 已過期"}), 401
+        except Exception:
+            return jsonify({"error": "Token 無效"}), 401
+
+        return f(*args, **kwargs)
+    return wrapper
+
+
+# === Hash 密碼 + 註冊 API (POST /register) ===
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少資料"}), 400
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"error": "請輸入 username 與 password"}), 400
+
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+
+    try:
+        c.execute("""
+            INSERT INTO users (username, password_hash, created_at)
+            VALUES (?, ?, ?)
+        """, (username, password_hash, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "此使用者已存在"}), 400
+    finally:
+        conn.close()
+
+    return jsonify({"message": "註冊成功"}), 200
+
+# === 登入 API ===
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少資料"}), 400
+
+    username = data.get("username")
+    password = data.get("password")
+
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "使用者不存在"}), 400
+
+    user_id, password_hash = row
+
+    if not bcrypt.checkpw(password.encode(), password_hash.encode()):
+        return jsonify({"error": "密碼錯誤"}), 400
+
+    token = jwt.encode(
+        {
+            "user_id": user_id,
+            "username": username,
+            "exp": datetime.utcnow() + timedelta(minutes=JWT_EXPIRE_MINUTES)
+        },
+        JWT_SECRET,
+        algorithm="HS256"
+    )
+
+    return jsonify({"message": "登入成功", "token": token}), 200
+
+
+# === 查詢排程結果記錄 (所有使用者的) ===
 @app.route("/check_logs", methods=["GET"])
 def get_scheduler_logs():
     conn = sqlite3.connect(DB_NAME)
@@ -109,10 +213,19 @@ def get_scheduler_logs():
     
 # === 查詢通知紀錄 ===
 @app.route("/notifications", methods=["GET"])
+@login_required
 def get_notifications():
+    user_id = request.user_id
+
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT id, flight_id, message, notify_time FROM notifications ORDER BY notify_time DESC")
+    c.execute("""
+        SELECT n.id, n.flight_id, n.message, n.notify_time, n.price
+        FROM notifications AS n
+        JOIN tracked_flights AS t ON n.flight_id = t.id
+        WHERE t.user_id = ?
+        ORDER BY n.notify_time DESC
+    """, (user_id,))
     rows = c.fetchall()
     conn.close()
 
@@ -122,15 +235,15 @@ def get_notifications():
             "id": r[0],
             "flight_id": r[1],
             "time": r[3],
-            "price": "N/A",
+            "price": r[4],
             "message": r[2]
         })
 
     return jsonify(data)
 
-
 # === 查詢航班 ===
 @app.route("/price", methods=["GET"])
+@login_required
 def get_price():
     departure_id = request.args.get("from")
     arrival_id = request.args.get("to")
@@ -205,7 +318,9 @@ def get_price():
 
 # === 加入追蹤 ===
 @app.route("/flights", methods=["POST"])
+@login_required
 def add_flight():
+    user_id = request.user_id
     data = request.get_json()
     if not data:
         return jsonify({"error": "缺少航班資料"}), 400
@@ -218,8 +333,9 @@ def add_flight():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO tracked_flights (from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tracked_flights
+        (from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["from"],
         data["to"],
@@ -227,7 +343,8 @@ def add_flight():
         data["airline"],
         data["depart_time"],
         data["arrival_time"],
-        data["price"]
+        data["price"],
+        user_id
     ))
     conn.commit()
     conn.close()
@@ -236,10 +353,17 @@ def add_flight():
 
 # === 查詢目前追蹤中的航班 ===
 @app.route("/flights", methods=["GET"])
+@login_required
 def get_tracked_flights():
+    user_id = request.user_id
+
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT * FROM tracked_flights")
+    c.execute("""
+        SELECT id, from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price
+        FROM tracked_flights
+        WHERE user_id = ?
+    """, (user_id,))
     rows = c.fetchall()
     conn.close()
 
@@ -257,10 +381,20 @@ def get_tracked_flights():
         })
     return jsonify(flights)
 
+# === 查詢票價歷史 ===
 @app.route("/prices/<int:flight_id>", methods=["GET"])
+@login_required
 def get_price_history(flight_id):
-    conn = sqlite3.connect("flights.db")
+    user_id = request.user_id
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
+
+    # 確認這個 flight 是此使用者的
+    c.execute("SELECT 1 FROM tracked_flights WHERE id = ? AND user_id = ?", (flight_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"error": "無權查詢此航班或航班不存在"}), 404
+
     c.execute("SELECT checked_time, price FROM prices WHERE flight_id = ? ORDER BY checked_time ASC", (flight_id,))
     rows = c.fetchall()
     conn.close()
@@ -270,6 +404,24 @@ def get_price_history(flight_id):
 
     data = [{"time": r[0], "price": r[1]} for r in rows]
     return jsonify(data)
+
+# === 刪除追蹤中的航班 ===
+@app.route("/flights/<int:flight_id>", methods=["DELETE"])
+@login_required
+def delete_flight(flight_id):
+    user_id = request.user_id
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("DELETE FROM tracked_flights WHERE id = ? AND user_id = ?", (flight_id, user_id))
+    deleted = c.rowcount
+    conn.commit()
+    conn.close()
+
+    if deleted == 0:
+        return jsonify({"error": "找不到此航班或無權刪除"}), 404
+
+    return jsonify({"message": f"已刪除追蹤航班 ID {flight_id}"}), 200
+
 
 # === 查詢最新票價 ===
 def fetch_latest_price(from_airport, to_airport, depart_time, return_time, flight_number):
@@ -316,69 +468,79 @@ def fetch_latest_price(from_airport, to_airport, depart_time, return_time, fligh
         print(f"⚠️ 抓取票價錯誤: {e}")
         return None
 
-# === 刪除追蹤中的航班 ===
-@app.route("/flights/<int:flight_id>", methods=["DELETE"])
-def delete_flight(flight_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("DELETE FROM tracked_flights WHERE id = ?", (flight_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": f"已刪除追蹤航班 ID {flight_id}"}), 200
 
-
-# === 排程任務：定期檢查所有追蹤航班 ===
 def scheduled_price_check():
     print("🔄 開始自動檢查票價...")
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT id, from_airport, to_airport, flight_number, depart_time, arrival_time, price FROM tracked_flights")
-    flights = c.fetchall()
 
-    for f in flights:
-        flight_id, from_a, to_a, flight_no, depart, arrive, old_price = f
-        new_price = fetch_latest_price(from_a, to_a, depart, arrive, flight_no)
-        if new_price is None:
-            print(f"⚠️ {flight_no} 票價更新失敗")
-            continue
+    # 先取得所有 user_id（避免混亂）
+    c.execute("SELECT DISTINCT user_id FROM tracked_flights WHERE user_id IS NOT NULL")
+    all_users = [row[0] for row in c.fetchall()]
 
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        c.execute("INSERT INTO prices (flight_id, checked_time, price) VALUES (?, ?, ?)",
-                  (flight_id, now, new_price))
-        conn.commit()
+    for user_id in all_users:
+        print(f"👤 正在檢查使用者 {user_id} 的航班...")
 
-        # 查詢歷史最低價
-        c.execute("SELECT MIN(price) FROM prices WHERE flight_id = ?", (flight_id,))
-        min_price = c.fetchone()[0]
-        if new_price < min_price:
-            message = f"{flight_no} 出現新低價：{new_price} TWD !!!!"
-            print("💰 " + message)
+        # 取得此使用者的航班
+        c.execute("""
+            SELECT id, from_airport, to_airport, flight_number, depart_time, arrival_time, price 
+            FROM tracked_flights
+            WHERE user_id = ?
+        """, (user_id,))
+        flights = c.fetchall()
 
-            # 儲存通知紀錄
+        for f in flights:
+            flight_id, from_a, to_a, flight_no, depart, arrive, old_price = f
+            new_price = fetch_latest_price(from_a, to_a, depart, arrive, flight_no)
+
+            if new_price is None:
+                print(f"⚠️ {flight_no}（user {user_id}）票價更新失敗")
+                continue
+
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # 寫入 price history
             c.execute("""
-                INSERT INTO notifications (flight_id, time, price, message)
-                VALUES (?, ?, ?, ?)
-            """, (flight_id, now, new_price, message))
+                INSERT INTO prices (flight_id, checked_time, price)
+                VALUES (?, ?, ?)
+            """, (flight_id, now, new_price))
             conn.commit()
 
-            # 推播至前端 PyQt
-            socketio.emit("price_alert", {
-                "flight_number": flight_no,
-                "price": new_price
-            })
-        elif new_price == min_price:
-            print(f"💰 {flight_no} 出現歷史低價：{new_price} TWD")
-        else:
-            print(f"✈️ {flight_no} 目前票價：{new_price} TWD")
-    # 記錄此次排程
+            # 查詢歷史最低價
+            c.execute("SELECT MIN(price) FROM prices WHERE flight_id = ?", (flight_id,))
+            min_price = c.fetchone()[0]
+
+            if new_price < min_price:
+                message = f"{flight_no} 出現新低價：{new_price} TWD !!!!"
+                print(f"💰 User {user_id} | {message}")
+
+                # 寫入通知紀錄
+                c.execute("""
+                    INSERT INTO notifications (flight_id, message, notify_time, price)
+                    VALUES (?, ?, ?, ?)
+                """, (flight_id, message, now, new_price))
+                conn.commit()
+
+                # 推播到前端 —— 指定 user_id
+                socketio.emit(f"price_alert_user_{user_id}", {
+                    "flight_number": flight_no,
+                    "price": new_price
+                })
+
+            elif new_price == min_price:
+                print(f"💰 User {user_id} | {flight_no} 出現歷史低價：{new_price} TWD")
+            else:
+                print(f"✈️ User {user_id} | {flight_no} 目前票價：{new_price} TWD")
+
+    # 排程紀錄（全系統）
     c.execute("""
         INSERT INTO scheduler_logs (time, status)
         VALUES (?, ?)
     """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "OK"))
     conn.commit()
-            
     conn.close()
-    print("✅ 自動票價更新完成")
+
+    print("✅ 所有使用者的自動票價更新完成")
     
 
 # === 啟動 APScheduler ===
@@ -389,6 +551,7 @@ scheduler.start()
 
 # === 主程式啟動 ===
 if __name__ == "__main__":
+    init_user_table()  
     init_db()
     init_scheduler_log_table()
     init_notification_table()
