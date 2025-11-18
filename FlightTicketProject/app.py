@@ -1,5 +1,6 @@
-﻿from flask_socketio import SocketIO, emit
+﻿from calendar import c
 from flask import Flask, request, jsonify
+from flask_socketio import SocketIO, emit
 import os
 import requests
 import sqlite3
@@ -36,6 +37,49 @@ def init_db():
     conn.commit()
     conn.close()
 
+'''def check_db():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    cur.execute("PRAGMA table_info(notifications);")
+    columns = cur.fetchall()
+
+    for c in columns:
+        print(c)
+
+    conn.close()
+'''
+# === 建立 notifications 表格 ===
+def init_notification_table():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            flight_id INTEGER,
+            notify_time TEXT,
+            price REAL,
+            message TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+#  === 建立 scheduler_logs 表格 ===
+def init_scheduler_log_table():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS scheduler_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            time TEXT,
+            status TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
 # === 建立 prices 表格 ===
 def init_price_table():
     conn = sqlite3.connect(DB_NAME)
@@ -51,6 +95,39 @@ def init_price_table():
     """)
     conn.commit()
     conn.close()
+
+# === 查詢排程結果記錄 ===
+@app.route("/check_logs", methods=["GET"])
+def get_scheduler_logs():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT time, status FROM scheduler_logs ORDER BY time DESC LIMIT 20")
+    rows = c.fetchall()
+    conn.close()
+
+    return jsonify([{"time": r[0], "status": r[1]} for r in rows])
+    
+# === 查詢通知紀錄 ===
+@app.route("/notifications", methods=["GET"])
+def get_notifications():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id, flight_id, message, notify_time FROM notifications ORDER BY notify_time DESC")
+    rows = c.fetchall()
+    conn.close()
+
+    data = []
+    for r in rows:
+        data.append({
+            "id": r[0],
+            "flight_id": r[1],
+            "time": r[3],
+            "price": "N/A",
+            "message": r[2]
+        })
+
+    return jsonify(data)
+
 
 # === 查詢航班 ===
 @app.route("/price", methods=["GET"])
@@ -277,6 +354,13 @@ def scheduled_price_check():
             message = f"{flight_no} 出現新低價：{new_price} TWD !!!!"
             print("💰 " + message)
 
+            # 儲存通知紀錄
+            c.execute("""
+                INSERT INTO notifications (flight_id, time, price, message)
+                VALUES (?, ?, ?, ?)
+            """, (flight_id, now, new_price, message))
+            conn.commit()
+
             # 推播至前端 PyQt
             socketio.emit("price_alert", {
                 "flight_number": flight_no,
@@ -286,10 +370,16 @@ def scheduled_price_check():
             print(f"💰 {flight_no} 出現歷史低價：{new_price} TWD")
         else:
             print(f"✈️ {flight_no} 目前票價：{new_price} TWD")
-
+    # 記錄此次排程
+    c.execute("""
+        INSERT INTO scheduler_logs (time, status)
+        VALUES (?, ?)
+    """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "OK"))
+    conn.commit()
+            
     conn.close()
     print("✅ 自動票價更新完成")
-
+    
 
 # === 啟動 APScheduler ===
 scheduler = BackgroundScheduler()
@@ -300,6 +390,8 @@ scheduler.start()
 # === 主程式啟動 ===
 if __name__ == "__main__":
     init_db()
+    init_scheduler_log_table()
+    init_notification_table()
     init_price_table()
 
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
