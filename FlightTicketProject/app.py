@@ -1,9 +1,16 @@
-﻿from flask import Flask, request, jsonify
+﻿from flask_socketio import SocketIO, emit
+from flask import Flask, request, jsonify
+import os
 import requests
 import sqlite3
 from datetime import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
+app.json.ensure_ascii = False #解決中文被轉成uni的問題
+
+# 初始化 SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # === RapidAPI 設定 ===
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
@@ -24,6 +31,22 @@ def init_db():
             depart_time TEXT,
             arrival_time TEXT,
             price REAL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# === 建立 prices 表格 ===
+def init_price_table():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            flight_id INTEGER,
+            checked_time TEXT,
+            price REAL,
+            FOREIGN KEY(flight_id) REFERENCES tracked_flights(id)
         )
     """)
     conn.commit()
@@ -171,6 +194,50 @@ def get_price_history(flight_id):
     data = [{"time": r[0], "price": r[1]} for r in rows]
     return jsonify(data)
 
+# === 查詢最新票價 ===
+def fetch_latest_price(from_airport, to_airport, depart_time, return_time, flight_number):
+    # 清理航班編號與日期格式
+    flight_number = flight_number.replace(" ", "").strip()
+    def normalize_date(dt):
+        try:
+            return datetime.strptime(dt[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
+        except Exception:
+            # 假如格式像 2026-3-12，補零
+            parts = dt.split(" ")[0].split("-")
+            return f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+
+    url = f"https://{RAPIDAPI_HOST}/api/v1/searchFlights"
+    headers = {
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": RAPIDAPI_HOST
+    }
+    query = {
+        "departure_id": from_airport,
+        "arrival_id": to_airport,
+        "outbound_date": normalize_date(depart_time),
+        "return_date": normalize_date(return_time),
+        "adults": "1",
+        "currency": "TWD"
+    }
+
+    try:
+        res = requests.get(url, headers=headers, params=query, timeout=30)
+        if res.status_code != 200:
+            print(f"⚠️ API 錯誤: {res.status_code} {res.text[:200]}")
+            return None
+
+        data = res.json()
+        top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
+        for f in top_flights:
+            f_no = f["flights"][0]["flight_number"].replace(" ", "").strip()
+            if f["price"] != "unavailable" and f_no == flight_number:
+                return float(f["price"])
+        print(f"⚠️ 找不到航班 {flight_number} 的最新票價")
+        return None
+
+    except Exception as e:
+        print(f"⚠️ 抓取票價錯誤: {e}")
+        return None
 
 # === 刪除追蹤中的航班 ===
 @app.route("/flights/<int:flight_id>", methods=["DELETE"])
@@ -182,7 +249,63 @@ def delete_flight(flight_id):
     conn.close()
     return jsonify({"message": f"已刪除追蹤航班 ID {flight_id}"}), 200
 
+
+# === 排程任務：定期檢查所有追蹤航班 ===
+def scheduled_price_check():
+    print("🔄 開始自動檢查票價...")
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id, from_airport, to_airport, flight_number, depart_time, arrival_time, price FROM tracked_flights")
+    flights = c.fetchall()
+
+    for f in flights:
+        flight_id, from_a, to_a, flight_no, depart, arrive, old_price = f
+        new_price = fetch_latest_price(from_a, to_a, depart, arrive, flight_no)
+        if new_price is None:
+            print(f"⚠️ {flight_no} 票價更新失敗")
+            continue
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("INSERT INTO prices (flight_id, checked_time, price) VALUES (?, ?, ?)",
+                  (flight_id, now, new_price))
+        conn.commit()
+
+        # 查詢歷史最低價
+        c.execute("SELECT MIN(price) FROM prices WHERE flight_id = ?", (flight_id,))
+        min_price = c.fetchone()[0]
+        if new_price < min_price:
+            message = f"{flight_no} 出現新低價：{new_price} TWD !!!!"
+            print("💰 " + message)
+
+            # 推播至前端 PyQt
+            socketio.emit("price_alert", {
+                "flight_number": flight_no,
+                "price": new_price
+            })
+        elif new_price == min_price:
+            print(f"💰 {flight_no} 出現歷史低價：{new_price} TWD")
+        else:
+            print(f"✈️ {flight_no} 目前票價：{new_price} TWD")
+
+    conn.close()
+    print("✅ 自動票價更新完成")
+
+
+# === 啟動 APScheduler ===
+scheduler = BackgroundScheduler()
+#設定更新時間
+scheduler.add_job(scheduled_price_check, "interval", minutes= 30)
+scheduler.start()
+
 # === 主程式啟動 ===
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    init_price_table()
+
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(scheduled_price_check, "interval", minutes=30)
+        scheduler.start()
+        print("🕒 APScheduler 已啟動")
+
+    socketio.run(app, debug=True)
