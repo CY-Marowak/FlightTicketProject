@@ -44,19 +44,15 @@ class FlightApp(QWidget):
         self.tabs.addTab(self.tracked_tab, "我的航班")
         self.init_tracked_tab()
 
-    # -------------------------------------------------
-    # 自動在桌面跳出通知
-    # -------------------------------------------------
-    def handle_price_alert(self, data):
-        flight_no = data.get("flight_number")
-        price = data.get("price")
+        # === 分頁3：通知紀錄 ===
+        self.notify_tab = QWidget()
+        self.tabs.addTab(self.notify_tab, "通知紀錄")
+        self.init_notify_tab()
 
-        # 在桌面彈出通知
-        notification.notify(
-            title="票價新低通知",
-            message=f"{flight_no} 出現新低價：{price} TWD",
-            timeout=5
-        )
+        # === 分頁4：排程日誌 ===
+        self.log_tab = QWidget()
+        self.tabs.addTab(self.log_tab, "排程日誌")
+        self.init_log_tab()
 
     # -------------------------------------------------
     # 查詢航班分頁
@@ -113,6 +109,43 @@ class FlightApp(QWidget):
         layout.addWidget(self.tracked_table)
 
         self.tracked_tab.setLayout(layout)
+
+    # -------------------------------------------------
+    # 通知紀錄分頁
+    # -------------------------------------------------
+    def init_notify_tab(self):
+        layout = QVBoxLayout()
+
+        refresh_btn = QPushButton("重新整理通知紀錄")
+        refresh_btn.clicked.connect(self.load_notifications)
+        layout.addWidget(refresh_btn)
+
+        self.notify_table = QTableWidget()
+        self.notify_table.setColumnCount(4)
+        self.notify_table.setHorizontalHeaderLabels(["時間", "航班", "價格", "訊息"])
+        self.notify_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        layout.addWidget(self.notify_table)
+        self.notify_tab.setLayout(layout)
+
+    # -------------------------------------------------
+    # 排程日誌分頁
+    # -------------------------------------------------
+    def init_log_tab(self):
+        layout = QVBoxLayout()
+
+        refresh_btn = QPushButton("重新整理排程日誌")
+        refresh_btn.clicked.connect(self.load_logs)
+        layout.addWidget(refresh_btn)
+
+        self.log_table = QTableWidget()
+        self.log_table.setColumnCount(2)
+        self.log_table.setHorizontalHeaderLabels(["時間", "狀態"])
+        self.log_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        layout.addWidget(self.log_table)
+        self.log_tab.setLayout(layout)
+
 
     # -------------------------------------------------
     # 查詢航班（呼叫 Flask /price）
@@ -223,7 +256,6 @@ class FlightApp(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"無法刪除航班: {e}")
 
-    # 
     # -------------------------------------------------
     # 加上顯示圖表
     # -------------------------------------------------
@@ -251,6 +283,62 @@ class FlightApp(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"無法顯示折線圖: {e}")
+       
+    # -------------------------------------------------
+    # 自動在桌面跳出通知
+    # -------------------------------------------------
+    def handle_price_alert(self, data):
+        flight_no = data.get("flight_number")
+        price = data.get("price")
+
+        # 在桌面彈出通知
+        notification.notify(
+            title="票價新低通知",
+            message=f"{flight_no} 出現新低價：{price} TWD",
+            timeout=5
+        )
+        
+    # -------------------------------------------------
+    # 載入通知
+    # -------------------------------------------------
+    def load_notifications(self):
+        try:
+            url = "http://127.0.0.1:5000/notifications"
+            response = requests.get(url)
+            data = response.json()
+
+            if isinstance(data, dict) and "message" in data:
+                QMessageBox.information(self, "提示", "目前沒有通知紀錄")
+                return
+
+            self.notify_table.setRowCount(len(data))
+
+            for i, n in enumerate(data):
+                self.notify_table.setItem(i, 0, QTableWidgetItem(n["time"]))
+                self.notify_table.setItem(i, 1, QTableWidgetItem(str(n["flight_id"])))
+                self.notify_table.setItem(i, 2, QTableWidgetItem(str(n["price"])))
+                self.notify_table.setItem(i, 3, QTableWidgetItem(n["message"]))
+
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法載入通知紀錄: {e}")
+
+    # -------------------------------------------------
+    # 載入排程日誌
+    # -------------------------------------------------
+    def load_logs(self):
+        try:
+            url = "http://127.0.0.1:5000/check_logs"
+            response = requests.get(url)
+            data = response.json()
+
+            self.log_table.setRowCount(len(data))
+
+            for i, log in enumerate(data):
+                self.log_table.setItem(i, 0, QTableWidgetItem(log["time"]))
+                self.log_table.setItem(i, 1, QTableWidgetItem(log["status"]))
+
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法載入排程日誌: {e}")
 
 
 if __name__ == "__main__":
