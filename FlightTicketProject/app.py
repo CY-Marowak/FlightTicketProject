@@ -131,6 +131,32 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+#migrate 一次性的
+def migrate_tracked_flights_add_user_id():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(tracked_flights)")
+    cols = [col[1] for col in c.fetchall()]
+    if "user_id" not in cols:
+        print("🔧 為 tracked_flights 新增 user_id 欄位...")
+        c.execute("ALTER TABLE tracked_flights ADD COLUMN user_id INTEGER")
+        conn.commit()
+        print("✅ user_id 欄位新增完成")
+    conn.close()
+
+def migrate_notifications_add_price():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(notifications)")
+    cols = [col[1] for col in c.fetchall()]
+    if "price" not in cols:
+        print("🔧 為 notifications 新增 price 欄位...")
+        c.execute("ALTER TABLE notifications ADD COLUMN price REAL")
+        conn.commit()
+        print("✅ price 欄位新增完成")
+    conn.close()
+
+
 
 # === Hash 密碼 + 註冊 API (POST /register) ===
 @app.route("/register", methods=["POST"])
@@ -197,7 +223,12 @@ def login():
         algorithm="HS256"
     )
 
-    return jsonify({"message": "登入成功", "token": token}), 200
+    return jsonify({
+        "message": "登入成功",
+        "token": token,
+        "user_id": user_id,
+        "username": username
+    }), 200
 
 
 # === 查詢排程結果記錄 (所有使用者的) ===
@@ -556,6 +587,8 @@ if __name__ == "__main__":
     init_scheduler_log_table()
     init_notification_table()
     init_price_table()
+    migrate_tracked_flights_add_user_id()
+    migrate_notifications_add_price()
 
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
         scheduler = BackgroundScheduler()
