@@ -3,9 +3,8 @@ import requests
 import socketio
 from plyer import notification
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QPushButton,
-    QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox,
-    QHeaderView, QTabWidget, QHBoxLayout
+    QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit,
+    QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView, QTabWidget, QHBoxLayout
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
@@ -23,24 +22,54 @@ class FlightApp(QWidget):
 
         self.setWindowTitle("航班查詢與追蹤系統")
         self.setGeometry(200, 200, 900, 600)
-        self.setWindowIcon(QIcon(ICON_PATH))
+        self.setWindowIcon(QIcon(ICON_PATH))  # 可自行替換 icon
 
-        # --- 主容器：登入 or APP Tabs ---
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
+        # --- 主分頁 ---
+        self.tabs = QTabWidget()
+        self.main_layout = QVBoxLayout()
+        self.main_layout.addWidget(self.tabs)
+        self.setLayout(self.main_layout)
 
         # 啟動登入畫面
         self.init_login_ui()
 
+        # 如果 token 存在 → 自動登入
+        try:
+            with open("token.txt", "r") as f:
+                self.token = f.read().strip()
+                self.auto_login()
+        except:
+            pass
+
     # -------------------------------------------------
-    # Login UI
+    # 自動登入
+    # -------------------------------------------------
+    def auto_login(self):
+        try:
+            res = requests.get(
+                "http://127.0.0.1:5000/profile",
+                headers={"Authorization": f"Bearer {self.token}"}
+            )
+            if res.status_code == 200:
+                data = res.json()
+                self.user_id = data["user_id"]
+                self.init_main_tabs()
+                self.init_socket(self.user_id)
+                print("🔓 自動登入成功")
+            else:
+                print("Token 失效，請重新登入")
+        except Exception as e:
+            print("自動登入失敗：", e)
+
+    # -------------------------------------------------
+    # 登入 UI
     # -------------------------------------------------
     def init_login_ui(self):
         """顯示登入頁面"""
-        self.clear_layout(self.layout)
+        self.clear_layout(self.main_layout)
 
         layout = QVBoxLayout()
-
+        
         layout.addWidget(QLabel("<h2>登入 Flight Tracker</h2>"))
 
         layout.addWidget(QLabel("帳號："))
@@ -60,7 +89,7 @@ class FlightApp(QWidget):
         register_btn.clicked.connect(self.attempt_register)
         layout.addWidget(register_btn)
 
-        self.layout.addLayout(layout)
+        self.main_layout.addLayout(layout)
 
     # -------------------------------------------------
     # Sign out UI
@@ -88,14 +117,14 @@ class FlightApp(QWidget):
         if not username or not password:
             QMessageBox.warning(self, "錯誤", "請輸入帳號與密碼")
             return
-
+        
         try:
             res = requests.post(
                 "http://127.0.0.1:5000/login",
                 json={"username": username, "password": password}
             )
             data = res.json()
-
+            
             if res.status_code != 200:
                 QMessageBox.warning(self, "登入失敗", data.get("error", "Unknown"))
                 return
@@ -104,13 +133,17 @@ class FlightApp(QWidget):
             self.token = data["token"]
             self.user_id = data["user_id"]
 
+            # 記住我（儲存 token）
+            with open("token.txt", "w") as f:
+                f.write(self.token)
+
             QMessageBox.information(self, "成功", "登入成功！")
 
             # 啟動主頁 UI
             self.init_main_tabs()
 
             # 啟動 SocketIO
-            self.init_socket()
+            self.init_socket(self.user_id)
 
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"登入失敗：{e}")
@@ -125,7 +158,7 @@ class FlightApp(QWidget):
         if not username or not password:
             QMessageBox.warning(self, "錯誤", "請輸入帳號與密碼")
             return
-
+        
         try:
             res = requests.post(
                 "http://127.0.0.1:5000/register",
@@ -147,9 +180,9 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def logout(self):
         confirm = QMessageBox.question(
-            self,
-            "登出確認",
-            "確定要登出嗎？",
+            self, 
+            "登出確認", 
+            "確定要登出嗎？", 
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
@@ -168,8 +201,8 @@ class FlightApp(QWidget):
         self.user_id = None
 
         # 清空 Tabs
-        self.clear_layout(self.layout)
-
+        self.clear_layout(self.main_layout)
+        
         # 返回登入畫面
         self.init_login_ui()
 
@@ -181,41 +214,46 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def init_main_tabs(self):
         """登入後顯示主頁 Tabs"""
-        self.clear_layout(self.layout)
+        self.clear_layout(self.main_layout)
 
         self.tabs = QTabWidget()
-        self.layout.addWidget(self.tabs)
+        self.main_layout.addWidget(self.tabs)
 
-        # === 分頁1：查詢航班 ===
-        self.query_tab = QWidget()
-        self.tabs.addTab(self.query_tab, "查詢航班")
-        self.init_query_tab()
+        # === 分頁1：查詢航班 === 
+        self.query_tab = QWidget() 
+        self.tabs.addTab(self.query_tab, "查詢航班") 
+        self.init_query_tab() 
 
-        # === 分頁2：我的航班 ===
-        self.tracked_tab = QWidget()
-        self.tabs.addTab(self.tracked_tab, "我的航班")
-        self.init_tracked_tab()
+        # === 分頁2：我的航班 === 
+        self.tracked_tab = QWidget() 
+        self.tabs.addTab(self.tracked_tab, "我的航班") 
+        self.init_tracked_tab() 
+        
+        # === 分頁3：通知紀錄 === 
+        self.notify_tab = QWidget() 
+        self.tabs.addTab(self.notify_tab, "通知紀錄") 
+        self.init_notify_tab() 
 
-        # === 分頁3：通知紀錄 ===
-        self.notify_tab = QWidget()
-        self.tabs.addTab(self.notify_tab, "通知紀錄")
-        self.init_notify_tab()
-
-        # === 分頁4：排程日誌 ===
-        self.log_tab = QWidget()
-        self.tabs.addTab(self.log_tab, "排程日誌")
-        self.init_log_tab()
-
-        # === 分頁5：設定 ===
-        self.settings_tab = QWidget()
-        self.tabs.addTab(self.settings_tab, "設定")
+        # === 分頁4：排程日誌 === 
+        self.log_tab = QWidget() 
+        self.tabs.addTab(self.log_tab, "排程日誌") 
+        self.init_log_tab() 
+        
+        # === 分頁5：個人資料 === 
+        self.profile_tab = QWidget() 
+        self.tabs.addTab(self.profile_tab, "個人資料") 
+        self.init_profile_tab() 
+        
+        # === 分頁6：設定 === 
+        self.settings_tab = QWidget() 
+        self.tabs.addTab(self.settings_tab, "設定") 
         self.init_settings_tab()
 
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------
     # SocketIO：登入後依 user_id 訂閱 price_alert_user_xxx
-    # ---------------------------------------------------------
-    def init_socket(self):
+    # -------------------------------------------------
+    def init_socket(self, user_id):
         self.sio = socketio.Client()
         event_name = f"price_alert_user_{self.user_id}"
 
@@ -231,10 +269,10 @@ class FlightApp(QWidget):
             )
 
             QMessageBox.information(
-                self,
-                "票價新低通知",
+                self, 
+                "票價新低通知", 
                 f"{flight} 出現新低價：{price} TWD"
-            )
+                )
 
         try:
             self.sio.connect("http://127.0.0.1:5000")
@@ -243,41 +281,104 @@ class FlightApp(QWidget):
             print("❌ SocketIO 連線錯誤：", e)
 
     # -------------------------------------------------
-    # 1. 查詢航班
+    # 查詢航班分頁
     # -------------------------------------------------
     def init_query_tab(self):
         layout = QVBoxLayout()
 
-        layout.addWidget(QLabel("出發機場代碼："))
+        layout.addWidget(QLabel("出發機場代碼 (e.g. TPE):"))
         self.from_input = QLineEdit("TPE")
         layout.addWidget(self.from_input)
 
-        layout.addWidget(QLabel("抵達機場代碼："))
+        layout.addWidget(QLabel("抵達機場代碼 (e.g. OKA):"))
         self.to_input = QLineEdit("OKA")
         layout.addWidget(self.to_input)
 
-        layout.addWidget(QLabel("出發日期："))
+        layout.addWidget(QLabel("出發日期 (YYYY-MM-DD):"))
         self.depart_input = QLineEdit("2026-03-12")
         layout.addWidget(self.depart_input)
 
-        layout.addWidget(QLabel("回程日期："))
+        layout.addWidget(QLabel("回程日期 (YYYY-MM-DD):"))
         self.return_input = QLineEdit("2026-03-15")
         layout.addWidget(self.return_input)
 
-        btn = QPushButton("查詢航班")
-        btn.clicked.connect(self.search_flights)
-        layout.addWidget(btn)
+        # 查詢按鈕
+        self.search_btn = QPushButton("查詢航班")
+        self.search_btn.clicked.connect(self.search_flights)
+        layout.addWidget(self.search_btn)
 
+        # 查詢結果表格
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(
-            ["航空公司", "航班編號", "出發時間", "抵達時間", "票價", "操作"]
-        )
+        self.table.setHorizontalHeaderLabels(["航空公司", "航班編號", "出發時間", "抵達時間", "票價 (TWD)", "操作"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
+        
         layout.addWidget(self.table)
         self.query_tab.setLayout(layout)
 
+
+    # -------------------------------------------------
+    # 我的航班分頁
+    # -------------------------------------------------
+    def init_tracked_tab(self):
+        layout = QVBoxLayout()
+
+        self.refresh_btn = QPushButton("重新整理追蹤清單")
+        self.refresh_btn.clicked.connect(self.load_tracked_flights)
+        layout.addWidget(self.refresh_btn)
+
+        self.tracked_table = QTableWidget()
+        self.tracked_table.setColumnCount(7)
+        self.tracked_table.setHorizontalHeaderLabels([
+            "航空公司", "航班編號", "出發時間", "抵達時間", "票價 (TWD)", "出發地", "操作"
+        ])
+        self.tracked_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        
+        layout.addWidget(self.tracked_table)
+        self.tracked_tab.setLayout(layout)
+
+
+    # -------------------------------------------------
+    # 通知紀錄分頁
+    # -------------------------------------------------
+    def init_notify_tab(self):
+        layout = QVBoxLayout()
+        
+        refresh_btn = QPushButton("重新整理通知紀錄")
+        refresh_btn.clicked.connect(self.load_notifications)
+        layout.addWidget(refresh_btn)
+
+        self.notify_table = QTableWidget()
+        self.notify_table.setColumnCount(4)
+        self.notify_table.setHorizontalHeaderLabels(["時間", "航班", "價格", "訊息"])
+        self.notify_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        
+        layout.addWidget(self.notify_table)
+        self.notify_tab.setLayout(layout)
+
+
+    # -------------------------------------------------
+    # 排程日誌分頁
+    # -------------------------------------------------
+    def init_log_tab(self):
+        layout = QVBoxLayout()
+
+        refresh_btn = QPushButton("重新整理排程日誌")
+        refresh_btn.clicked.connect(self.load_logs)
+        layout.addWidget(refresh_btn)
+
+        self.log_table = QTableWidget()
+        self.log_table.setColumnCount(2)
+        self.log_table.setHorizontalHeaderLabels(["時間", "狀態"])
+        self.log_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        
+        layout.addWidget(self.log_table)
+        self.log_tab.setLayout(layout)
+
+
+    # -------------------------------------------------
+    # 查詢航班（呼叫 Flask /price）
+    # -------------------------------------------------
     def search_flights(self):
         from_airport = self.from_input.text().strip()
         to_airport = self.to_input.text().strip()
@@ -287,77 +388,65 @@ class FlightApp(QWidget):
         url = f"http://127.0.0.1:5000/price?from={from_airport}&to={to_airport}&depart={depart_date}&return={return_date}"
 
         try:
-            response = requests.get(url, headers=self.auth())
+            response = requests.get(url)
             data = response.json()
 
-            if "flights" not in data:
-                QMessageBox.warning(self, "錯誤", data.get("error", "查詢失敗"))
+            if "flights" not in data or not data["flights"]:
+                QMessageBox.warning(self, "查詢結果", "查無航班或API連線錯誤")
                 return
-
+            
             self.display_flights(data["flights"])
-
+        
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"查詢失敗: {e}")
 
     def display_flights(self, flights):
         self.table.setRowCount(len(flights))
-
-        for i, f in enumerate(flights):
-            self.table.setItem(i, 0, QTableWidgetItem(f["airline"]))
-            self.table.setItem(i, 1, QTableWidgetItem(f["flight_number"]))
-            self.table.setItem(i, 2, QTableWidgetItem(f["depart_time"]))
-            self.table.setItem(i, 3, QTableWidgetItem(f["arrival_time"]))
-            self.table.setItem(i, 4, QTableWidgetItem(str(f["price"])))
-
+        for i, flight in enumerate(flights):
+            self.table.setItem(i, 0, QTableWidgetItem(flight["airline"]))
+            self.table.setItem(i, 1, QTableWidgetItem(flight["flight_number"]))
+            self.table.setItem(i, 2, QTableWidgetItem(flight["depart_time"]))
+            self.table.setItem(i, 3, QTableWidgetItem(flight["arrival_time"]))
+            self.table.setItem(i, 4, QTableWidgetItem(str(flight["price"])))
+            
             btn = QPushButton("加入追蹤")
-            btn.clicked.connect(lambda _, ff=f: self.add_to_tracking(ff))
+            btn.clicked.connect(lambda _, f=flight: self.add_to_tracking(f))
             self.table.setCellWidget(i, 5, btn)
 
     # -------------------------------------------------
-    # 2. 加入追蹤
+    # 加入追蹤（POST /flights）
     # -------------------------------------------------
-    def add_to_tracking(self, f):
+    def add_to_tracking(self, flight):
+        url = "http://127.0.0.1:5000/flights"
         try:
-            res = requests.post(
-                "http://127.0.0.1:5000/flights",
-                json=f,
-                headers=self.auth()
-            )
-            data = res.json()
-            if res.status_code == 200:
-                QMessageBox.information(self, "成功", data["message"])
+            response = requests.post(url, json=flight)
+            data = response.json()
+            if response.status_code == 200:
+                QMessageBox.information(self, "成功", data.get("message", "已加入追蹤"))
             else:
-                QMessageBox.warning(self, "錯誤", data.get("error"))
+                QMessageBox.warning(self, "失敗", data.get("error", "加入追蹤失敗"))
         except Exception as e:
-            QMessageBox.critical(self, "錯誤", f"加入失敗：{e}")
+            QMessageBox.critical(self, "錯誤", f"無法加入追蹤: {e}")
 
     # -------------------------------------------------
-    # 3. 我的航班
+    # 載入追蹤中的航班（GET /flights）
     # -------------------------------------------------
-    def init_tracked_tab(self):
-        layout = QVBoxLayout()
-
-        refresh_btn = QPushButton("重新整理")
-        refresh_btn.clicked.connect(self.load_tracked_flights)
-        layout.addWidget(refresh_btn)
-
-        self.tracked_table = QTableWidget()
-        self.tracked_table.setColumnCount(7)
-        self.tracked_table.setHorizontalHeaderLabels(
-            ["航空公司", "航班編號", "出發時間", "抵達時間", "價格", "出發地", "操作"]
-        )
-        self.tracked_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(self.tracked_table)
-
-        self.tracked_tab.setLayout(layout)
-
     def load_tracked_flights(self):
+        url = "http://127.0.0.1:5000/flights"
         try:
-            res = requests.get("http://127.0.0.1:5000/flights", headers=self.auth())
-            data = res.json()
+            response = requests.get(url, headers=self.auth())  # ✅ 加上 headers
+            data = response.json()
+            
+            if not isinstance(data, list):
+                QMessageBox.warning(self, "錯誤", f"伺服器回傳非清單：{data}")
+                return
+
+            if not data:
+                QMessageBox.information(self, "提示", "目前沒有追蹤中的航班")
+                return
 
             self.tracked_table.setRowCount(len(data))
-
+            
             for i, f in enumerate(data):
                 self.tracked_table.setItem(i, 0, QTableWidgetItem(f["airline"]))
                 self.tracked_table.setItem(i, 1, QTableWidgetItem(f["flight_number"]))
@@ -366,142 +455,221 @@ class FlightApp(QWidget):
                 self.tracked_table.setItem(i, 4, QTableWidgetItem(str(f["price"])))
                 self.tracked_table.setItem(i, 5, QTableWidgetItem(f["from"]))
 
-                # 操作按鈕
-                hl = QHBoxLayout()
-                hl.setAlignment(Qt.AlignCenter)
+                # 刪除按鈕
+                btn_layout = QHBoxLayout()
+                btn_layout.setAlignment(Qt.AlignCenter)
 
-                btn_del = QPushButton("刪除")
-                btn_del.clicked.connect(lambda _, fid=f["id"]: self.delete_flight(fid))
-                hl.addWidget(btn_del)
+                del_btn = QPushButton("刪除")
+                del_btn.clicked.connect(lambda _, fid=f["id"]: self.delete_flight(fid))
+                btn_layout.addWidget(del_btn)
 
-                btn_chart = QPushButton("折線圖")
-                btn_chart.clicked.connect(
-                    lambda _, fid=f["id"], fn=f["flight_number"]: self.show_price_chart(fid, fn)
-                )
-                hl.addWidget(btn_chart)
+                chart_btn = QPushButton("折線圖")
+                chart_btn.clicked.connect(lambda _, fid=f["id"], fn=f["flight_number"]: self.show_price_chart(fid, fn))
+                btn_layout.addWidget(chart_btn)
 
-                cell = QWidget()
-                cell.setLayout(hl)
-                self.tracked_table.setCellWidget(i, 6, cell)
+                cell_widget = QWidget()
+                cell_widget.setLayout(btn_layout)
+                self.tracked_table.setCellWidget(i, 6, cell_widget)
 
         except Exception as e:
-            QMessageBox.critical(self, "錯誤", f"載入追蹤航班失敗：{e}")
+            QMessageBox.critical(self, "錯誤", f"無法載入追蹤清單: {e}")
+
 
     # -------------------------------------------------
-    # 4. 刪除追蹤航班
+    # 刪除航班（DELETE /flights/<id>）
     # -------------------------------------------------
     def delete_flight(self, flight_id):
+        url = f"http://127.0.0.1:5000/flights/{flight_id}"
         try:
-            res = requests.delete(
-                f"http://127.0.0.1:5000/flights/{flight_id}",
-                headers=self.auth()
-            )
-            data = res.json()
-            if res.status_code == 200:
-                QMessageBox.information(self, "成功", data["message"])
+            response = requests.delete(url)
+            data = response.json()
+            if response.status_code == 200:
+                QMessageBox.information(self, "成功", data.get("message", "已刪除航班"))
                 self.load_tracked_flights()
             else:
-                QMessageBox.warning(self, "錯誤", data.get("error"))
+                QMessageBox.warning(self, "失敗", data.get("error", "刪除失敗"))
         except Exception as e:
-            QMessageBox.critical(self, "錯誤", f"刪除失敗：{e}")
+            QMessageBox.critical(self, "錯誤", f"無法刪除航班: {e}")
 
     # -------------------------------------------------
-    # 5. 顯示折線圖
+    # 加上顯示圖表
     # -------------------------------------------------
     def show_price_chart(self, flight_id, flight_number):
+        url = f"http://127.0.0.1:5000/prices/{flight_id}"
         try:
-            res = requests.get(
-                f"http://127.0.0.1:5000/prices/{flight_id}",
-                headers=self.auth()
-            )
-            if res.status_code != 200:
-                QMessageBox.warning(self, "提示", "此航班尚無紀錄")
+            response = requests.get(url)
+            if response.status_code != 200:
+                QMessageBox.warning(self, "提示", "此航班目前沒有票價紀錄")
                 return
 
-            data = res.json()
-            times = [x["time"] for x in data]
-            prices = [x["price"] for x in data]
+            data = response.json()
+            times = [d["time"] for d in data]
+            prices = [d["price"] for d in data]
 
             plt.figure(figsize=(7, 4))
-            plt.plot(times, prices, marker="o", linewidth=2)
-            plt.title(f"{flight_number} 票價變化圖")
-            plt.xlabel("時間")
-            plt.ylabel("票價")
+            plt.plot(times, prices, marker='o', linestyle='-', linewidth=2)
+            plt.title(f"票價變化圖 - {flight_number}")
+            plt.xlabel("查詢時間")
+            plt.ylabel("票價 (TWD)")
             plt.xticks(rotation=45)
             plt.tight_layout()
             plt.grid(True)
             plt.show()
 
         except Exception as e:
-            QMessageBox.critical(self, "錯誤", f"無法顯示折線圖：{e}")
+            QMessageBox.critical(self, "錯誤", f"無法顯示折線圖: {e}")
+
 
     # -------------------------------------------------
-    # 6. 載入通知紀錄
+    # 自動在桌面跳出通知
     # -------------------------------------------------
-    def init_notify_tab(self):
-        layout = QVBoxLayout()
+    def handle_price_alert(self, data):
+        flight_no = data.get("flight_number")
+        price = data.get("price")
 
-        btn = QPushButton("重新整理通知紀錄")
-        btn.clicked.connect(self.load_notifications)
-        layout.addWidget(btn)
-
-        self.notify_table = QTableWidget()
-        self.notify_table.setColumnCount(4)
-        self.notify_table.setHorizontalHeaderLabels(
-            ["時間", "航班ID", "價格", "訊息"]
+        # 在桌面彈出通知
+        notification.notify(
+            title="票價新低通知",
+            message=f"{flight_no} 出現新低價：{price} TWD",
+            timeout=5
         )
-        self.notify_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(self.notify_table)
 
-        self.notify_tab.setLayout(layout)
-
+    # -------------------------------------------------
+    # 載入通知
+    # -------------------------------------------------
     def load_notifications(self):
         try:
-            res = requests.get("http://127.0.0.1:5000/notifications", headers=self.auth())
-            data = res.json()
+            url = "http://127.0.0.1:5000/notifications"
+            response = requests.get(url, headers=self.auth())  # ✅ 加上 headers
+            data = response.json()
+            
+            if not isinstance(data, list):
+                QMessageBox.warning(self, "錯誤", f"伺服器回傳非清單：{data}")
+                return
+
+            if not data:
+                QMessageBox.information(self, "提示", "目前沒有通知紀錄")
+                return
 
             self.notify_table.setRowCount(len(data))
-
+            
             for i, n in enumerate(data):
                 self.notify_table.setItem(i, 0, QTableWidgetItem(n["time"]))
                 self.notify_table.setItem(i, 1, QTableWidgetItem(str(n["flight_id"])))
                 self.notify_table.setItem(i, 2, QTableWidgetItem(str(n["price"])))
                 self.notify_table.setItem(i, 3, QTableWidgetItem(n["message"]))
-
+        
         except Exception as e:
-            QMessageBox.critical(self, "錯誤", f"通知載入失敗：{e}")
+            QMessageBox.critical(self, "錯誤", f"無法載入通知紀錄: {e}")
+
 
     # -------------------------------------------------
-    # 7. 排程日誌
+    # 載入排程日誌
     # -------------------------------------------------
-    def init_log_tab(self):
-        layout = QVBoxLayout()
-
-        btn = QPushButton("重新整理排程日誌")
-        btn.clicked.connect(self.load_logs)
-        layout.addWidget(btn)
-
-        self.log_table = QTableWidget()
-        self.log_table.setColumnCount(2)
-        self.log_table.setHorizontalHeaderLabels(["時間", "狀態"])
-        self.log_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        layout.addWidget(self.log_table)
-
-        self.log_tab.setLayout(layout)
-
     def load_logs(self):
         try:
-            res = requests.get("http://127.0.0.1:5000/check_logs", headers=self.auth())
-            data = res.json()
-
+            url = "http://127.0.0.1:5000/check_logs"
+            response = requests.get(url)
+            data = response.json()
+            
             self.log_table.setRowCount(len(data))
-
+            
             for i, log in enumerate(data):
                 self.log_table.setItem(i, 0, QTableWidgetItem(log["time"]))
                 self.log_table.setItem(i, 1, QTableWidgetItem(log["status"]))
-
+        
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"日誌載入失敗：{e}")
+
+    # -------------------------------------------------
+    # 8. 個人資料
+    # -------------------------------------------------
+    def init_profile_tab(self):
+        layout = QVBoxLayout()
+        title = QLabel("<h2>👤 個人資料</h2>")
+        layout.addWidget(title)
+
+        self.profile_label = QLabel("正在載入使用者資料...")
+        self.profile_label.setStyleSheet("font-size: 14px;")
+        layout.addWidget(self.profile_label)
+
+        refresh_btn = QPushButton("重新載入個人資料")
+        refresh_btn.clicked.connect(self.load_profile)
+        layout.addWidget(refresh_btn)
+
+        # === 修改密碼功能 ===
+        layout.addSpacing(15)
+        pw_title = QLabel("<h3>🔒 修改密碼</h3>")
+        layout.addWidget(pw_title)
+
+        old_pw_label = QLabel("舊密碼：")
+        self.old_pw_input = QLineEdit()
+        self.old_pw_input.setEchoMode(QLineEdit.Password)
+
+        new_pw_label = QLabel("新密碼：")
+        self.new_pw_input = QLineEdit()
+        self.new_pw_input.setEchoMode(QLineEdit.Password)
+
+        layout.addWidget(old_pw_label)
+        layout.addWidget(self.old_pw_input)
+        layout.addWidget(new_pw_label)
+        layout.addWidget(self.new_pw_input)
+
+        change_btn = QPushButton("修改密碼")
+        change_btn.setStyleSheet("background-color: #0275d8; color: white; font-weight: bold;")
+        change_btn.clicked.connect(self.open_change_pw)
+        layout.addWidget(change_btn)
+
+        layout.addStretch()
+        self.profile_tab.setLayout(layout)
+        
+        # 初始化資料
+        self.load_profile()
+
+
+    def load_profile(self):
+        """呼叫 /profile 取得使用者資料"""
+        try:
+            res = requests.get("http://127.0.0.1:5000/profile", headers=self.auth())
+            if res.status_code != 200:
+                QMessageBox.warning(self, "錯誤", f"讀取失敗：{res.text}")
+                return
+
+            data = res.json()
+            text = (
+                f"🆔 使用者 ID：{data.get('user_id', '未知')}\n"
+                f"👤 帳號名稱：{data.get('username', '未知')}\n"
+                f"📅 註冊時間：{data.get('created_at', '未知')}"
+            )
+            self.profile_label.setText(text)
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"無法載入個人資料：{e}")
+
+    def open_change_pw(self):
+        """呼叫 /change_password"""
+        old_pw = self.old_pw_input.text().strip()
+        new_pw = self.new_pw_input.text().strip()
+        
+        if not old_pw or not new_pw:
+            QMessageBox.warning(self, "錯誤", "請輸入舊密碼與新密碼")
+            return
+
+        try:
+            res = requests.post(
+                "http://127.0.0.1:5000/change_password",
+                json={"old_password": old_pw, "new_password": new_pw},
+                headers=self.auth()
+            )
+            data = res.json()
+            if res.status_code == 200:
+                QMessageBox.information(self, "成功", "密碼修改成功！")
+                self.old_pw_input.clear()
+                self.new_pw_input.clear()
+            else:
+                QMessageBox.warning(self, "失敗", data.get("error", "修改失敗"))
+        except Exception as e:
+            QMessageBox.critical(self, "錯誤", f"修改密碼時發生錯誤：{e}")
+
 
     # -------------------------------------------------
     # Utils
@@ -520,9 +688,6 @@ class FlightApp(QWidget):
                 w.deleteLater()
 
 
-# -------------------------------------------------
-# Main
-# -------------------------------------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = FlightApp()
