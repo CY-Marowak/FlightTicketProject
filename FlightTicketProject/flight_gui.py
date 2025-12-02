@@ -68,28 +68,74 @@ class FlightApp(QWidget):
         """顯示登入頁面"""
         self.clear_layout(self.main_layout)
 
-        layout = QVBoxLayout()
-        
-        layout.addWidget(QLabel("<h2>登入 Flight Tracker</h2>"))
+        # 清空舊 widget（防止重疊）
+        for i in reversed(range(self.main_layout.count())):
+            item = self.main_layout.takeAt(i)
+            if item.widget():
+                item.widget().deleteLater()
 
-        layout.addWidget(QLabel("帳號："))
+        # --- 白色主容器（外層） ---
+        login_container = QWidget()
+        login_layout = QVBoxLayout(login_container)
+        login_layout.setContentsMargins(80, 60, 80, 60)
+        login_layout.setSpacing(20)
+
+        login_container.setStyleSheet("""
+            QWidget {
+                background-color: white;
+                border: 2px solid #cccccc;
+                border-radius: 15px;
+            }
+            QLabel {
+                font-size: 15px;
+            }
+            QLineEdit {
+                height: 30px;
+                border: 1px solid #aaa;
+                border-radius: 5px;
+                padding: 4px;
+            }
+            QPushButton {
+                height: 34px;
+                border-radius: 6px;
+            }
+        """)
+
+        # 標題
+        title = QLabel("<h2>登入 Flight Tracker</h2>")
+        title.setAlignment(Qt.AlignCenter)
+        login_layout.addWidget(title)
+
+        # 帳號
+        user_label = QLabel("帳號：")
         self.login_user = QLineEdit()
-        layout.addWidget(self.login_user)
+        self.login_user.setPlaceholderText("請輸入帳號")
+        login_layout.addWidget(user_label)
+        login_layout.addWidget(self.login_user)
 
-        layout.addWidget(QLabel("密碼："))
+        # 密碼
+        pass_label = QLabel("密碼：")
         self.login_pass = QLineEdit()
         self.login_pass.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self.login_pass)
+        self.login_pass.setPlaceholderText("請輸入密碼")
+        login_layout.addWidget(pass_label)
+        login_layout.addWidget(self.login_pass)
 
+        # 登入 / 註冊按鈕
         login_btn = QPushButton("登入")
-        login_btn.clicked.connect(self.attempt_login)
-        layout.addWidget(login_btn)
-
         register_btn = QPushButton("註冊")
+        login_btn.clicked.connect(self.attempt_login)
         register_btn.clicked.connect(self.attempt_register)
-        layout.addWidget(register_btn)
+        login_layout.addWidget(login_btn)
+        login_layout.addWidget(register_btn)
+        
+        # --- 把整個白框放入主畫面中央 ---
+        outer_layout = QVBoxLayout()
+        outer_layout.addStretch()
+        outer_layout.addWidget(login_container, alignment=Qt.AlignCenter)
+        outer_layout.addStretch()
 
-        self.main_layout.addLayout(layout)
+        self.main_layout.addLayout(outer_layout)
 
     # -------------------------------------------------
     # Sign out UI
@@ -681,11 +727,17 @@ class FlightApp(QWidget):
         return {"Authorization": f"Bearer {self.token}"}
 
     def clear_layout(self, layout):
-        """清掉所有 widget"""
+        """清除所有 widget"""
         while layout.count():
-            w = layout.takeAt(0).widget()
-            if w:
-                w.deleteLater()
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            else:
+                sub_layout = item.layout()
+                if sub_layout is not None:
+                    self.clear_layout(sub_layout)
+
 
 
 if __name__ == "__main__":
