@@ -110,6 +110,10 @@ def init_price_table():
     conn.commit()
     conn.close()
 
+# === 正常顯示首頁 ===
+@app.route("/", methods=["GET"])
+def index():
+    return "✅ Flight Ticket Tracker Backend is running!"
 
 # === 建立 token 驗證 (所有 API 加上登入保護) ===
 def login_required(f):
