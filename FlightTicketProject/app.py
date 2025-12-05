@@ -226,7 +226,8 @@ def login():
     return jsonify({
     "message": "登入成功",
     "token": token,
-    "user_id": user_id
+    "user_id": user_id,
+    "username": username
 }), 200
 
 # === 修改密碼 ===
@@ -625,7 +626,13 @@ scheduler.add_job(scheduled_price_check, "interval", minutes=30)
 scheduler.start()
 
 
-# === 主程式啟動 ===
+init_user_table()
+init_db()
+init_scheduler_log_table()
+init_notification_table()
+init_price_table()
+
+
 if __name__ == "__main__":
     init_user_table()
     init_db()
@@ -633,10 +640,11 @@ if __name__ == "__main__":
     init_notification_table()
     init_price_table()
 
-    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+    # 避免 Flask debug reload 重複啟動 scheduler
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
         scheduler.add_job(scheduled_price_check, "interval", minutes=30)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
-    socketio.run(app, debug=True)
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=True)
