@@ -9,9 +9,12 @@ import jwt
 from datetime import datetime, timedelta
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
+
+load_dotenv()  # 載入 .env
 
 # 新增 JWT Secret Key
-JWT_SECRET = "SILVER_BULLET"
+JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGO = "HS256"
 JWT_EXPIRE_MINUTES = 10080  # 7 天
 
@@ -23,7 +26,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # === RapidAPI 設定 ===
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
-RAPIDAPI_KEY = "c2e285b6f4msh6a1da4d7047fb58p1f5b65jsn96fa996ffe3c"
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 # === 初始化 SQLite ===
 DB_NAME = "flights.db"
