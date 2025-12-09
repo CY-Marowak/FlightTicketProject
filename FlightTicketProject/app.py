@@ -58,7 +58,8 @@ def init_db():
             airline TEXT,
             depart_time TEXT,
             arrival_time TEXT,
-            price REAL
+            price REAL,
+            user_id INTEGER
         )
     """)
     conn.commit()
@@ -109,6 +110,15 @@ def init_price_table():
     """)
     conn.commit()
     conn.close()
+
+# --- DB INIT ---
+init_user_table()
+init_db()
+init_notification_table()
+init_scheduler_log_table()
+init_price_table()
+# ------------------------------------
+
 
 # === 正常顯示首頁 ===
 @app.route("/", methods=["GET"])
@@ -625,20 +635,14 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(scheduled_price_check, "interval", minutes=30)
 scheduler.start()
 
-
-init_user_table()
-init_db()
-init_scheduler_log_table()
-init_notification_table()
-init_price_table()
-
-
 if __name__ == "__main__":
+    '''
     init_user_table()
     init_db()
     init_scheduler_log_table()
     init_notification_table()
     init_price_table()
+    '''
 
     # 避免 Flask debug reload 重複啟動 scheduler
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
