@@ -52,6 +52,8 @@ class FlightApp(QWidget):
                 f"{API_URL}/profile",
                 headers={"Authorization": f"Bearer {self.token}"}
             )
+            print("DEBUG /profile status:", res.status_code)
+            print("DEBUG /profile text:", res.text[:300])
             
             if res.status_code == 200:
                 data = res.json()
@@ -172,6 +174,9 @@ class FlightApp(QWidget):
                 f"{API_URL}/login",
                 json={"username": username, "password": password}
             )
+
+            print("DEBUG /login status:", res.status_code)
+            print("DEBUG /login text:", res.text[:300])
 
             # 先確認是不是 JSON
             try:
