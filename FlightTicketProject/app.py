@@ -22,7 +22,9 @@ app = Flask(__name__)
 app.json.ensure_ascii = False # 解決中文被轉成uni的問題
 
 # 初始化 SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+#socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+
 
 # === RapidAPI 設定 ===
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
@@ -651,4 +653,15 @@ if __name__ == "__main__":
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
-    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=True)
+    # === 使用 eventlet 啟動 SocketIO（正式版本） ===
+    import eventlet
+    import eventlet.wsgi
+
+    port = int(os.environ.get("PORT", 10000))
+
+    print(f"🚀 使用 eventlet 啟動 server，埠號：{port}")
+
+    eventlet.wsgi.server(
+        eventlet.listen(("0.0.0.0", port)),
+        app
+    )
