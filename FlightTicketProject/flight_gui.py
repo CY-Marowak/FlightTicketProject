@@ -1,5 +1,6 @@
 ﻿import sys
 import requests
+from requests import api
 import socketio
 from plyer import notification
 from PyQt5.QtWidgets import (
@@ -11,6 +12,7 @@ from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
 
 ICON_PATH = "plane.png"
+API_URL = "http://127.0.0.1:10000"
 
 class FlightApp(QWidget):
     def __init__(self):
@@ -47,11 +49,9 @@ class FlightApp(QWidget):
     def auto_login(self):
         try:
             res = requests.get(
-                "https://flightticketproject.onrender.com/profile",
+                f"{API_URL}/profile",
                 headers={"Authorization": f"Bearer {self.token}"}
             )
-            print("DEBUG /profile status:", res.status_code)
-            print("DEBUG /profile text:", res.text[:300])
             
             if res.status_code == 200:
                 data = res.json()
@@ -169,12 +169,9 @@ class FlightApp(QWidget):
         
         try:
             res = requests.post(
-                "https://flightticketproject.onrender.com/login",
+                f"{API_URL}/login",
                 json={"username": username, "password": password}
             )
-            # 先印出 debug，之後有問題很好查
-            print("DEBUG /login status:", res.status_code)
-            print("DEBUG /login text:", res.text[:300])
 
             # 先確認是不是 JSON
             try:
@@ -223,7 +220,7 @@ class FlightApp(QWidget):
         
         try:
             res = requests.post(
-                "https://flightticketproject.onrender.com/register",
+                f"{API_URL}/register",
                 json={"username": username, "password": password}
             )
             data = res.json()
@@ -337,7 +334,7 @@ class FlightApp(QWidget):
                 )
 
         try:
-            self.sio.connect("https://flightticketproject.onrender.com")
+            self.sio.connect(API_URL)
             print(f"🔌 已連線 SocketIO，監聽：{event_name}")
         except Exception as e:
             print("❌ SocketIO 連線錯誤：", e)
@@ -447,7 +444,7 @@ class FlightApp(QWidget):
         depart_date = self.depart_input.text().strip()
         return_date = self.return_input.text().strip()
 
-        url = f"https://flightticketproject.onrender.com/price?from={from_airport}&to={to_airport}&depart={depart_date}&return={return_date}"
+        url = f"{API_URL}/price?from={from_airport}&to={to_airport}&depart={depart_date}&return={return_date}"
 
         try:
             response = requests.get(url)
@@ -479,7 +476,7 @@ class FlightApp(QWidget):
     # 加入追蹤（POST /flights）
     # -------------------------------------------------
     def add_to_tracking(self, flight):
-        url = "https://flightticketproject.onrender.com/flights"
+        url = f"{API_URL}/flights"
         try:
             response = requests.post(url, json=flight)
             data = response.json()
@@ -494,7 +491,7 @@ class FlightApp(QWidget):
     # 載入追蹤中的航班（GET /flights）
     # -------------------------------------------------
     def load_tracked_flights(self):
-        url = "https://flightticketproject.onrender.com/flights"
+        url = f"{API_URL}/flights"
         try:
             response = requests.get(url, headers=self.auth())  # ✅ 加上 headers
             data = response.json()
@@ -541,7 +538,7 @@ class FlightApp(QWidget):
     # 刪除航班（DELETE /flights/<id>）
     # -------------------------------------------------
     def delete_flight(self, flight_id):
-        url = f"https://flightticketproject.onrender.com/flights/{flight_id}"
+        url = f"{API_URL}/flights/{flight_id}"
         try:
             response = requests.delete(url)
             data = response.json()
@@ -557,7 +554,7 @@ class FlightApp(QWidget):
     # 加上顯示圖表
     # -------------------------------------------------
     def show_price_chart(self, flight_id, flight_number):
-        url = f"https://flightticketproject.onrender.com/prices/{flight_id}"
+        url = f"{API_URL}/prices/{flight_id}"
         try:
             response = requests.get(url)
             if response.status_code != 200:
@@ -601,8 +598,13 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def load_notifications(self):
         try:
-            url = "https://flightticketproject.onrender.com/notifications"
+            url = f"{API_URL}/notifications"
             response = requests.get(url, headers=self.auth())  # ✅ 加上 headers
+
+            if response.status_code != 200:
+                QMessageBox.warning(self, "錯誤", f"伺服器回傳錯誤：{response.text}")
+                return
+            
             data = response.json()
             
             if not isinstance(data, list):
@@ -630,7 +632,7 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def load_logs(self):
         try:
-            url = "https://flightticketproject.onrender.com/check_logs"
+            url = f"{API_URL}/check_logs"
             response = requests.get(url)
             data = response.json()
             
@@ -692,7 +694,7 @@ class FlightApp(QWidget):
     def load_profile(self):
         """呼叫 /profile 取得使用者資料"""
         try:
-            res = requests.get("https://flightticketproject.onrender.com/profile", headers=self.auth())
+            res = requests.get(f"{API_URL}/profile", headers=self.auth())
             if res.status_code != 200:
                 QMessageBox.warning(self, "錯誤", f"讀取失敗：{res.text}")
                 return
@@ -718,7 +720,7 @@ class FlightApp(QWidget):
 
         try:
             res = requests.post(
-                "https://flightticketproject.onrender.com/change_password",
+                f"{API_URL}/change_password",
                 json={"old_password": old_pw, "new_password": new_pw},
                 headers=self.auth()
             )
