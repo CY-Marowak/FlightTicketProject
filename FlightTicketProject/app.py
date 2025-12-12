@@ -1,4 +1,4 @@
-﻿from calendar import c
+﻿# from calendar import c
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
 import os
@@ -10,6 +10,10 @@ from datetime import datetime, timedelta
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
+# 使用 eventlet 啟動 SocketIO 伺服器
+import eventlet    
+import eventlet.wsgi
+import logging
 
 load_dotenv()  # 載入 .env
 
@@ -21,10 +25,17 @@ JWT_EXPIRE_MINUTES = 10080  # 7 天
 app = Flask(__name__)
 app.json.ensure_ascii = False # 解決中文被轉成uni的問題
 
-# 初始化 SocketIO
-#socketio = SocketIO(app, cors_allowed_origins="*")
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+# logger 讓系統可以log每次執行的操作
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.INFO)
+# 自訂 before_request log（讓每個 API 都印出清楚的請求資訊）
+@app.before_request
+def log_request():
+    print(f"[REQ] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
+          f"{request.remote_addr} | {request.method} {request.path}")
 
+# 初始化 SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 # === RapidAPI 設定 ===
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
@@ -631,37 +642,20 @@ def scheduled_price_check():
     print("✅ 所有使用者的自動票價更新完成")
 
 
-# === 啟動 APScheduler ===
-scheduler = BackgroundScheduler()
-# 設定更新時間
-scheduler.add_job(scheduled_price_check, "interval", minutes=30)
-scheduler.start()
-
+# ==============================================
+# 正式啟動後端（eventlet + SocketIO）
+# ==============================================
 if __name__ == "__main__":
-    '''
-    init_user_table()
-    init_db()
-    init_scheduler_log_table()
-    init_notification_table()
-    init_price_table()
-    '''
-
-    # 避免 Flask debug reload 重複啟動 scheduler
+    # 避免 Flask debug reload 啟動兩次 scheduler
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
         scheduler.add_job(scheduled_price_check, "interval", minutes=30)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
-    # === 使用 eventlet 啟動 SocketIO（正式版本） ===
-    import eventlet
-    import eventlet.wsgi
-
     port = int(os.environ.get("PORT", 10000))
+    print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
 
-    print(f"🚀 使用 eventlet 啟動 server，埠號：{port}")
+    # 必須用 socketio.run，而不是 wsgi.server
+    socketio.run(app, host="0.0.0.0", port=port, debug=False)
 
-    eventlet.wsgi.server(
-        eventlet.listen(("0.0.0.0", port)),
-        app
-    )
