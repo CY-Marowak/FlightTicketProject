@@ -12,7 +12,7 @@ from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
 
 ICON_PATH = "plane.png"
-API_URL = "http://127.0.0.1:10000"
+API_URL = "https://flightticketproject.onrender.com"
 
 class FlightApp(QWidget):
     def __init__(self):
