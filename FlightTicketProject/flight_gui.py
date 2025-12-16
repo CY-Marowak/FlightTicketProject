@@ -33,7 +33,8 @@ class FlightApp(QWidget):
         self.setLayout(self.main_layout)
 
         # 啟動登入畫面
-        self.init_login_ui()
+        self.show_login_view()
+
 
         # 如果 token 存在 → 自動登入
         try:
@@ -42,6 +43,20 @@ class FlightApp(QWidget):
                 self.auto_login()
         except:
             pass
+
+    # =========================
+    # View Switcher
+    # =========================
+
+    def show_login_view(self):
+        """顯示登入畫面"""
+        self.reset_main_view()
+        self.init_login_ui()
+
+    def show_main_view(self):
+        """顯示主功能畫面（Tabs）"""
+        self.reset_main_view()
+        self.init_main_tabs()
 
     # -------------------------------------------------
     # 自動登入
@@ -58,7 +73,7 @@ class FlightApp(QWidget):
             if res.status_code == 200:
                 data = res.json()
                 self.user_id = data["user_id"]
-                self.init_main_tabs()
+                self.show_main_view()
                 self.init_socket(self.user_id)
                 print("🔓 自動登入成功")
             else:
@@ -71,13 +86,7 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def init_login_ui(self):
         """顯示登入頁面"""
-        self.clear_layout(self.main_layout)
-
-        # 清空舊 widget（防止重疊）
-        for i in reversed(range(self.main_layout.count())):
-            item = self.main_layout.takeAt(i)
-            if item.widget():
-                item.widget().deleteLater()
+        self.reset_main_view()
 
         # --- 白色主容器（外層） ---
         login_container = QWidget()
@@ -204,7 +213,7 @@ class FlightApp(QWidget):
             QMessageBox.information(self, "成功", "登入成功！")
 
             # 啟動主頁 UI
-            self.init_main_tabs()
+            self.show_main_view()
 
             # 啟動 SocketIO
             self.init_socket(self.user_id)
@@ -265,10 +274,8 @@ class FlightApp(QWidget):
         self.user_id = None
 
         # 清空 Tabs
-        self.clear_layout(self.main_layout)
-        
         # 返回登入畫面
-        self.init_login_ui()
+        self.show_login_view()
 
         QMessageBox.information(self, "成功", "您已成功登出")
 
@@ -278,7 +285,7 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def init_main_tabs(self):
         """登入後顯示主頁 Tabs"""
-        self.clear_layout(self.main_layout)
+        self.reset_main_view()
 
         self.tabs = QTabWidget()
         self.main_layout.addWidget(self.tabs)
@@ -339,7 +346,7 @@ class FlightApp(QWidget):
                 )
 
         try:
-            self.sio.connect(API_URL)
+            self.sio.connect(API_URL, transports=["websocket"])
             print(f"🔌 已連線 SocketIO，監聽：{event_name}")
         except Exception as e:
             print("❌ SocketIO 連線錯誤：", e)
@@ -455,7 +462,7 @@ class FlightApp(QWidget):
             response = requests.get(url)
             data = response.json()
 
-            if "flights" not in data or not data["flights"]:
+            if not data.get("flights"):
                 QMessageBox.warning(self, "查詢結果", "查無航班或API連線錯誤")
                 return
             
@@ -483,7 +490,7 @@ class FlightApp(QWidget):
     def add_to_tracking(self, flight):
         url = f"{API_URL}/flights"
         try:
-            response = requests.post(url, json=flight)
+            response = requests.post(url, json=flight, headers=self.auth())
             data = response.json()
             if response.status_code == 200:
                 QMessageBox.information(self, "成功", data.get("message", "已加入追蹤"))
@@ -545,7 +552,7 @@ class FlightApp(QWidget):
     def delete_flight(self, flight_id):
         url = f"{API_URL}/flights/{flight_id}"
         try:
-            response = requests.delete(url)
+            response = requests.delete(url, headers=self.auth())
             data = response.json()
             if response.status_code == 200:
                 QMessageBox.information(self, "成功", data.get("message", "已刪除航班"))
@@ -561,7 +568,7 @@ class FlightApp(QWidget):
     def show_price_chart(self, flight_id, flight_number):
         url = f"{API_URL}/prices/{flight_id}"
         try:
-            response = requests.get(url)
+            response = requests.get(url, headers=self.auth())
             if response.status_code != 200:
                 QMessageBox.warning(self, "提示", "此航班目前沒有票價紀錄")
                 return
@@ -749,17 +756,17 @@ class FlightApp(QWidget):
             return {}
         return {"Authorization": f"Bearer {self.token}"}
 
-    def clear_layout(self, layout):
-        """清除所有 widget"""
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            else:
-                sub_layout = item.layout()
-                if sub_layout is not None:
-                    self.clear_layout(sub_layout)
+    def reset_main_view(self):
+        """
+        安全地清空整個主畫面 layout
+        避免 widget 殘留 / layout 重複綁定 / memory leak
+        """
+        old_layout = self.layout()
+        if old_layout is not None:
+            QWidget().setLayout(old_layout)
+
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
 
 
 
