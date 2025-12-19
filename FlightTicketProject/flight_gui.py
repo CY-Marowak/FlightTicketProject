@@ -1,4 +1,6 @@
 ﻿import sys
+import certifi
+import os
 import requests
 from requests import api
 import socketio
@@ -10,9 +12,25 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
+from pathlib import Path
 
+os.environ["SSL_CERT_FILE"] = certifi.where() # SSL 憑證
+
+APP_NAME = "FlightTicketTracker"
 ICON_PATH = "plane.png"
 API_URL = "https://flightticketproject.onrender.com"
+
+def get_app_dir():
+    base = Path.home() / f".{APP_NAME}"
+    base.mkdir(exist_ok=True)
+    return base
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class FlightApp(QWidget):
     def __init__(self):
@@ -24,7 +42,8 @@ class FlightApp(QWidget):
 
         self.setWindowTitle("航班查詢與追蹤系統")
         self.setGeometry(200, 200, 900, 600)
-        self.setWindowIcon(QIcon(ICON_PATH))  # 可自行替換 icon
+        #self.setWindowIcon(QIcon(ICON_PATH))  # 可自行替換 icon
+        self.setWindowIcon(QIcon(resource_path(ICON_PATH)))
 
         # --- 主分頁 ---
         self.tabs = QTabWidget()
@@ -38,11 +57,27 @@ class FlightApp(QWidget):
 
         # 如果 token 存在 → 自動登入
         try:
-            with open("token.txt", "r") as f:
-                self.token = f.read().strip()
+            self.token = self.load_token()
+            if self.token:
                 self.auto_login()
+            '''with open("token.txt", "r") as f:
+                self.token = f.read().strip()
+                self.auto_login()'''
         except:
             pass
+
+    # =========================
+    # Token Handler
+    # =========================
+    def save_token(self, token):
+        path = get_app_dir() / "token.txt"
+        path.write_text(token, encoding="utf-8")
+
+    def load_token(self):
+        path = get_app_dir() / "token.txt"
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        return None
 
     # =========================
     # View Switcher
@@ -207,8 +242,9 @@ class FlightApp(QWidget):
             self.user_id = data["user_id"]
 
             # 記住我（儲存 token）
-            with open("token.txt", "w") as f:
-                f.write(self.token)
+            '''with open("token.txt", "w") as f:
+                f.write(self.token)'''
+            self.save_token(self.token)
 
             QMessageBox.information(self, "成功", "登入成功！")
 
@@ -325,7 +361,12 @@ class FlightApp(QWidget):
     # SocketIO：登入後依 user_id 訂閱 price_alert_user_xxx
     # -------------------------------------------------
     def init_socket(self, user_id):
-        self.sio = socketio.Client()
+        self.sio = socketio.Client(
+            reconnection=True,
+            reconnection_attempts=5,
+            reconnection_delay=2
+        )
+
         event_name = f"price_alert_user_{self.user_id}"
 
         @self.sio.on(event_name)
@@ -346,8 +387,11 @@ class FlightApp(QWidget):
                 )
 
         try:
-            self.sio.connect(API_URL, transports=["websocket"])
-            print(f"🔌 已連線 SocketIO，監聽：{event_name}")
+            self.sio.connect(
+                API_URL,
+                transports=["websocket", "polling"]
+            )
+            print(f"🔌 SocketIO connected: {event_name}")
         except Exception as e:
             print("❌ SocketIO 連線錯誤：", e)
 
