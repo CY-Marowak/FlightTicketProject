@@ -2,7 +2,6 @@
 import certifi
 import os
 import requests
-from requests import api
 import socketio
 from plyer import notification
 from PyQt5.QtWidgets import (
@@ -13,17 +12,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
 from pathlib import Path
-
-os.environ["SSL_CERT_FILE"] = certifi.where() # SSL 憑證
-
-APP_NAME = "FlightTicketTracker"
-ICON_PATH = "plane.png"
-API_URL = "https://flightticketproject.onrender.com"
-
-def get_app_dir():
-    base = Path.home() / f".{APP_NAME}"
-    base.mkdir(exist_ok=True)
-    return base
+from app_info import APP_NAME, APP_VERSION
 
 def resource_path(relative_path):
     try:
@@ -31,6 +20,27 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
+
+os.environ["SSL_CERT_FILE"] = certifi.where() # SSL 憑證
+
+APP_NAME = "FlightTicketTracker"
+ICON_PATH = resource_path("app_icon.png")
+API_URL = "https://flightticketproject.onrender.com"
+
+def get_app_dir():
+    base = Path.home() / f".{APP_NAME}"
+    base.mkdir(exist_ok=True)
+    return base
+
+def app_data_dir():
+    if sys.platform == "win32":
+        return Path.home() / "AppData" / "Roaming" / "FlightTicketTracker"
+    elif sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "FlightTicketTracker"
+    else:
+        return Path.home() / ".flight_ticket_tracker"
+
 
 class FlightApp(QWidget):
     def __init__(self):
@@ -40,10 +50,9 @@ class FlightApp(QWidget):
         self.user_id = None
         self.sio = None
 
-        self.setWindowTitle("航班查詢與追蹤系統")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.setGeometry(200, 200, 900, 600)
-        #self.setWindowIcon(QIcon(ICON_PATH))  # 可自行替換 icon
-        self.setWindowIcon(QIcon(resource_path(ICON_PATH)))
+        self.setWindowIcon(QIcon(str(ICON_PATH)))
 
         # --- 主分頁 ---
         self.tabs = QTabWidget()
@@ -60,9 +69,6 @@ class FlightApp(QWidget):
             self.token = self.load_token()
             if self.token:
                 self.auto_login()
-            '''with open("token.txt", "r") as f:
-                self.token = f.read().strip()
-                self.auto_login()'''
         except:
             pass
 
@@ -79,10 +85,18 @@ class FlightApp(QWidget):
             return path.read_text(encoding="utf-8")
         return None
 
+    def delete_token(self):
+        path = get_app_dir() / "token.txt"
+        try:
+            if path.exists():
+                path.unlink()
+                print("🧹 Token 已刪除")
+        except Exception as e:
+            print("⚠️ 刪除 token 失敗:", e)
+
     # =========================
     # View Switcher
     # =========================
-
     def show_login_view(self):
         """顯示登入畫面"""
         self.reset_main_view()
@@ -242,8 +256,6 @@ class FlightApp(QWidget):
             self.user_id = data["user_id"]
 
             # 記住我（儲存 token）
-            '''with open("token.txt", "w") as f:
-                f.write(self.token)'''
             self.save_token(self.token)
 
             QMessageBox.information(self, "成功", "登入成功！")
@@ -289,31 +301,35 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     def logout(self):
         confirm = QMessageBox.question(
-            self, 
-            "登出確認", 
-            "確定要登出嗎？", 
+            self,
+            "登出確認",
+            "確定要登出嗎？",
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
             return
 
-        # 關閉 socketio
+        # 1️ 中斷 SocketIO
         try:
-            if self.sio:
+            if self.sio and self.sio.connected:
                 self.sio.disconnect()
                 self.sio = None
         except Exception as e:
             print("⚠️ SocketIO disconnect error:", e)
 
-        # 清空 token / user_id
+        # 2️ 清除 token（記憶體）
         self.token = None
         self.user_id = None
 
-        # 清空 Tabs
-        # 返回登入畫面
+        # 3️ 清除 token（檔案）
+        self.delete_token()
+
+        # 4️ 重置畫面
+        self.reset_main_view()
         self.show_login_view()
 
         QMessageBox.information(self, "成功", "您已成功登出")
+
 
 
     # -------------------------------------------------
