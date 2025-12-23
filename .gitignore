@@ -30,6 +30,7 @@ __pycache__/
 flights.db
 
 # === 🧰 Virtual Environments ===
+Build_and_Packed/
 venv-desktop/
 venv/
 .venv/
