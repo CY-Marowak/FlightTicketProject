@@ -1,6 +1,7 @@
 ﻿# from calendar import c
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 import os
 import requests
 import sqlite3
@@ -24,6 +25,13 @@ JWT_EXPIRE_MINUTES = 10080  # 7 天
 
 app = Flask(__name__)
 app.json.ensure_ascii = False # 解決中文被轉成uni的問題
+
+# 解決全域開發問題
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    supports_credentials=True
+)
 
 # logger 讓系統可以log每次執行的操作
 log = logging.getLogger('werkzeug')
