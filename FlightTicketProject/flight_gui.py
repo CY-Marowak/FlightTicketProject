@@ -575,6 +575,10 @@ class FlightApp(QWidget):
                 QMessageBox.warning(self, "錯誤", f"伺服器回傳非清單：{data}")
                 return
 
+            # ⭐ 關鍵：先清空表格
+            self.tracked_table.clearContents()
+            self.tracked_table.setRowCount(0)
+
             if not data:
                 QMessageBox.information(self, "提示", "目前沒有追蹤中的航班")
                 return
@@ -591,13 +595,19 @@ class FlightApp(QWidget):
 
                 # 刪除按鈕
                 btn_layout = QHBoxLayout()
+                btn_layout.setContentsMargins(4, 2, 4, 2)   # 關鍵
+                btn_layout.setSpacing(6)                   # 關鍵
                 btn_layout.setAlignment(Qt.AlignCenter)
 
                 del_btn = QPushButton("刪除")
+                del_btn.setMinimumWidth(60)
+                del_btn.setMinimumHeight(28)
                 del_btn.clicked.connect(lambda _, fid=f["id"]: self.delete_flight(fid))
                 btn_layout.addWidget(del_btn)
 
                 chart_btn = QPushButton("折線圖")
+                del_btn.setMinimumWidth(60)
+                del_btn.setMinimumHeight(28)
                 chart_btn.clicked.connect(lambda _, fid=f["id"], fn=f["flight_number"]: self.show_price_chart(fid, fn))
                 btn_layout.addWidget(chart_btn)
 
