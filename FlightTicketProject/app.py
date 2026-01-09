@@ -357,7 +357,6 @@ def get_notifications():
 
 # === 查詢航班 ===
 @app.route("/price", methods=["GET"])
-@login_required
 def get_price():
     departure_id = request.args.get("from")
     arrival_id = request.args.get("to")

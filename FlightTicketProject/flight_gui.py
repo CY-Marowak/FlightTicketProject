@@ -522,6 +522,9 @@ class FlightApp(QWidget):
             response = requests.get(url)
             data = response.json()
 
+            print("DEBUG status:", response.status_code)
+            print("DEBUG text:", response.text)
+
             if not data.get("flights"):
                 QMessageBox.warning(self, "查詢結果", "查無航班或API連線錯誤")
                 return
