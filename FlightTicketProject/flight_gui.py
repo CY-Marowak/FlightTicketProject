@@ -13,6 +13,7 @@ from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
 from pathlib import Path
 from app_info import APP_NAME, APP_VERSION
+from dateutil import parser
 
 def resource_path(relative_path):
     try:
@@ -785,10 +786,11 @@ class FlightApp(QWidget):
                 return
 
             data = res.json()
+            local_time = parser.isoparse(data.get('created_at', '未知')).astimezone()
             text = (
                 f"🆔 使用者 ID：{data.get('user_id', '未知')}\n"
                 f"👤 帳號名稱：{data.get('username', '未知')}\n"
-                f"📅 註冊時間：{data.get('created_at', '未知')}"
+                f"📅 註冊時間：{local_time}"
             )
             self.profile_label.setText(text)
         except Exception as e:
