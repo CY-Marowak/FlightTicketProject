@@ -211,7 +211,7 @@ def register():
         c.execute("""
             INSERT INTO users (username, password_hash, created_at)
             VALUES (?, ?, ?)
-        """, (username, password_hash, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
+        """, (username, password_hash, datetime.now(timezone.utc).isoformat()))
         conn.commit()
     except sqlite3.IntegrityError:
         return jsonify({"error": "此使用者已存在"}), 400
@@ -603,8 +603,8 @@ def scheduled_price_check():
                 print(f"⚠️ {flight_no}（user {user_id}）票價更新失敗")
                 continue
 
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-            
+            now = datetime.now(timezone.utc).isoformat()
+
             # 寫入 price history
             c.execute("""
                 INSERT INTO prices (flight_id, checked_time, price)
@@ -642,7 +642,7 @@ def scheduled_price_check():
     c.execute("""
         INSERT INTO scheduler_logs (time, status)
         VALUES (?, ?)
-    """, (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), "OK"))
+    """, (datetime.now(timezone.utc).isoformat(), "OK"))
     conn.commit()
     conn.close()
     
