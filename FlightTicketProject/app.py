@@ -7,7 +7,7 @@ import requests
 import sqlite3
 import bcrypt
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
@@ -39,7 +39,7 @@ log.setLevel(logging.INFO)
 # 自訂 before_request log（讓每個 API 都印出清楚的請求資訊）
 @app.before_request
 def log_request():
-    print(f"[REQ] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
+    print(f"[REQ] {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} | "
           f"{request.remote_addr} | {request.method} {request.path}")
 
 # 初始化 SocketIO
@@ -211,7 +211,7 @@ def register():
         c.execute("""
             INSERT INTO users (username, password_hash, created_at)
             VALUES (?, ?, ?)
-        """, (username, password_hash, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        """, (username, password_hash, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")))
         conn.commit()
     except sqlite3.IntegrityError:
         return jsonify({"error": "此使用者已存在"}), 400
@@ -248,7 +248,7 @@ def login():
         {
             "user_id": user_id,
             "username": username,
-            "exp": datetime.utcnow() + timedelta(minutes=JWT_EXPIRE_MINUTES)
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
         },
         JWT_SECRET,
         algorithm=JWT_ALGO
@@ -603,7 +603,7 @@ def scheduled_price_check():
                 print(f"⚠️ {flight_no}（user {user_id}）票價更新失敗")
                 continue
 
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             
             # 寫入 price history
             c.execute("""
@@ -642,7 +642,7 @@ def scheduled_price_check():
     c.execute("""
         INSERT INTO scheduler_logs (time, status)
         VALUES (?, ?)
-    """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "OK"))
+    """, (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), "OK"))
     conn.commit()
     conn.close()
     
@@ -656,7 +656,7 @@ if __name__ == "__main__":
     # 避免 Flask debug reload 啟動兩次 scheduler
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
-        scheduler.add_job(scheduled_price_check, "interval", minutes=30)
+        scheduler.add_job(scheduled_price_check, "interval", minutes=10)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
