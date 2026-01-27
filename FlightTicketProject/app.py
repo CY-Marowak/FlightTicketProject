@@ -616,24 +616,10 @@ def scheduled_price_check():
             c.execute("SELECT MIN(price) FROM prices WHERE flight_id = ?", (flight_id,))
             min_price = c.fetchone()[0]
 
-            # 寫入通知紀錄
-            c.execute("""
-                INSERT INTO notifications (flight_id, message, notify_time, price)
-                VALUES (?, ?, ?, ?)
-            """, (flight_id, message, now, new_price))
-            conn.commit()
-                
-            # 推播到前端 —— 指定 user_id
-            socketio.emit(f"price_alert_user_{user_id}", {
-                "flight_number": flight_no,
-                "price": new_price
-            })
-
             if new_price < min_price:
                 message = f"{flight_no} 出現新低價：{new_price} TWD !!!!"
                 print(f"💰 User {user_id} | {message}")
                 
-                '''
                 # 寫入通知紀錄
                 c.execute("""
                     INSERT INTO notifications (flight_id, message, notify_time, price)
@@ -645,8 +631,7 @@ def scheduled_price_check():
                 socketio.emit(f"price_alert_user_{user_id}", {
                     "flight_number": flight_no,
                     "price": new_price
-                })
-                '''
+                })               
             
             elif new_price == min_price:
                 print(f"💰 User {user_id} | {flight_no} 出現歷史低價：{new_price} TWD")
@@ -671,7 +656,7 @@ if __name__ == "__main__":
     # 避免 Flask debug reload 啟動兩次 scheduler
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
-        scheduler.add_job(scheduled_price_check, "interval", minutes=3)
+        scheduler.add_job(scheduled_price_check, "interval", minutes=5)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
