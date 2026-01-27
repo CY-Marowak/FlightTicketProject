@@ -653,15 +653,18 @@ def scheduled_price_check():
 # 正式啟動後端（eventlet + SocketIO）
 # ==============================================
 if __name__ == "__main__":
-    # 避免 Flask debug reload 啟動兩次 scheduler
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
+
+    # 取得當前是否為 Debug 模式
+    is_debug = False
+
+    # 1. 生產環境(debug=False)直接啟動 2. 開發環境(debug=True) 則檢查是否為 Werkzeug 的主進程
+    if not is_debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
         scheduler.add_job(scheduled_price_check, "interval", minutes=5)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
-
-    port = int(os.environ.get("PORT", 10000))
-    print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
 
     # 必須用 socketio.run，而不是 wsgi.server
     socketio.run(app, host="0.0.0.0", port=port, debug=False)
