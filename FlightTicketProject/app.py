@@ -445,6 +445,19 @@ def add_flight():
 
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
+
+    # 檢查是否已經追蹤過（同user、同航班號、同出發時間）
+    c.execute("""
+        SELECT id FROM tracked_flights 
+        WHERE user_id = ? AND flight_number = ? AND depart_time = ?
+    """, (user_id, data["flight_number"], data["depart_time"]))
+
+    existing_flight = c.fetchone()
+    if existing_flight:
+        conn.close()
+        return jsonify({"error": f"您已經追蹤過此航班 {data['flight_number']} 了"}), 400
+
+    # 沒追蹤過 加入追蹤
     c.execute("""
         INSERT INTO tracked_flights (from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price, user_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
