@@ -455,7 +455,7 @@ def add_flight():
     existing_flight = c.fetchone()
     if existing_flight:
         conn.close()
-        return jsonify({"error": f"您已經追蹤過此航班 {data['flight_number']} 了"}), 400
+        return jsonify({"error": f"您已經追蹤過此航班 {data['flight_number']} 了"}), 409
 
     # 沒追蹤過 加入追蹤
     c.execute("""
