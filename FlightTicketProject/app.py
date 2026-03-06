@@ -4,13 +4,15 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import os
 import requests
-import sqlite3
+import psycopg2
+#import sqlite3
 import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
+from psycopg2 import IntegrityError # PostgreSQL 約束錯誤
 # 使用 eventlet 啟動 SocketIO 伺服器
 import eventlet    
 import eventlet.wsgi
@@ -49,95 +51,82 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 RAPIDAPI_HOST = "google-flights2.p.rapidapi.com"
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
-# === 初始化 SQLite ===
-DB_NAME = "flights.db"
-# === 建立 users 表格 ===
-def init_user_table():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password_hash TEXT,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+# 在 Render 的 Environment 設定中增加 DATABASE_URL
+DB_URL = os.environ.get("DATABASE_URL")
 
-# === 建立 trackflights 表格 ===
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS tracked_flights (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            from_airport TEXT,
-            to_airport TEXT,
-            flight_number TEXT,
-            airline TEXT,
-            depart_time TEXT,
-            arrival_time TEXT,
-            price REAL,
-            user_id INTEGER
-        )
-    """)
-    conn.commit()
-    conn.close()
+def get_db_connection():
+    # PostgreSQL 連線方式
+    conn = psycopg2.connect(DB_URL)
+    return conn
 
-# === 建立 notifications 表格 ===
-def init_notification_table():
-    conn = sqlite3.connect(DB_NAME)
+# === 統一初始化所有 PostgreSQL 表格 ===
+def init_all_tables():
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            flight_id INTEGER,
-            notify_time TEXT,
-            price REAL,
-            message TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-# === 建立 scheduler_logs 表格 ===
-def init_scheduler_log_table():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS scheduler_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            time TEXT,
-            status TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-# === 建立 prices 表格 ===
-def init_price_table():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS prices (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            flight_id INTEGER,
-            checked_time TEXT,
-            price REAL,
-            FOREIGN KEY(flight_id) REFERENCES tracked_flights(id)
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-# --- DB INIT ---
-init_user_table()
-init_db()
-init_notification_table()
-init_scheduler_log_table()
-init_price_table()
+    try:
+        # 1. Users
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT
+            )
+        """)
+        
+        # 2. Tracked Flights
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS tracked_flights (
+                id SERIAL PRIMARY KEY,
+                from_airport TEXT,
+                to_airport TEXT,
+                flight_number TEXT,
+                airline TEXT,
+                depart_time TEXT,
+                arrival_time TEXT,
+                price DOUBLE PRECISION,
+                user_id INTEGER REFERENCES users(id)
+            )
+        """)
+        
+        # 3. Notifications
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                flight_id INTEGER,
+                notify_time TEXT,
+                price DOUBLE PRECISION,
+                message TEXT
+            )
+        """)
+        
+        # 4. Scheduler Logs
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS scheduler_logs (
+                id SERIAL PRIMARY KEY,
+                time TEXT,
+                status TEXT
+            )
+        """)
+        
+        # 5. Prices
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS prices (
+                id SERIAL PRIMARY KEY,
+                flight_id INTEGER REFERENCES tracked_flights(id),
+                checked_time TEXT,
+                price DOUBLE PRECISION
+            )
+        """)
+        
+        conn.commit()
+        print("✅ PostgreSQL 資料表初始化完成")
+    except Exception as e:
+        print(f"❌ 初始化資料表失敗: {e}")
+        conn.rollback()
+    finally:
+        c.close()
+        conn.close()
 # ------------------------------------
 
 
@@ -204,18 +193,19 @@ def register():
 
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
     
     try:
         c.execute("""
             INSERT INTO users (username, password_hash, created_at)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
         """, (username, password_hash, datetime.now(timezone.utc).isoformat()))
         conn.commit()
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return jsonify({"error": "此使用者已存在"}), 400
     finally:
+        c.close()
         conn.close()
     
     return jsonify({"message": "註冊成功"}), 200
@@ -230,10 +220,11 @@ def login():
     username = data.get("username")
     password = data.get("password")
     
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+    c.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
     row = c.fetchone()
+    c.close()
     conn.close()
     
     if not row:
@@ -272,25 +263,28 @@ def change_password():
     if not old_pw or not new_pw:
         return jsonify({"error": "缺少 old/new password"}), 400
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT password_hash FROM users WHERE id = ?", (request.user_id,))
+    c.execute("SELECT password_hash FROM users WHERE id = %s", (request.user_id,))
     row = c.fetchone()
     
     if not row:
+        c.close()
         conn.close()
         return jsonify({"error": "找不到使用者"}), 404
     hashed = row[0]
 
     # 驗證舊密碼
     if not bcrypt.checkpw(old_pw.encode(), hashed.encode()):
+        c.close()
         conn.close()
         return jsonify({"error": "舊密碼錯誤"}), 400
 
     # 新密碼加密
     new_hashed = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
-    c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hashed, request.user_id))
+    c.execute("UPDATE users SET password_hash = %s WHERE id = %s", (new_hashed, request.user_id))
     conn.commit()
+    c.close()
     conn.close()
     
     return jsonify({"message": "密碼更新成功"})
@@ -299,10 +293,11 @@ def change_password():
 @app.route("/profile", methods=["GET"])
 @token_required
 def get_profile():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id, username, created_at FROM users WHERE id = ?", (request.user_id,))
+    c.execute("SELECT id, username, created_at FROM users WHERE id = %s", (request.user_id,))
     row = c.fetchone()
+    c.close()
     conn.close()
     
     if not row:
@@ -317,10 +312,11 @@ def get_profile():
 # === 查詢排程結果記錄 (所有使用者的) ===
 @app.route("/check_logs", methods=["GET"])
 def get_scheduler_logs():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT time, status FROM scheduler_logs ORDER BY time DESC LIMIT 20")
     rows = c.fetchall()
+    c.close()
     conn.close()
     
     return jsonify([{"time": r[0], "status": r[1]} for r in rows])
@@ -331,16 +327,17 @@ def get_scheduler_logs():
 def get_notifications():
     user_id = request.user_id
     
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
         SELECT n.id, n.flight_id, n.message, n.notify_time, n.price
         FROM notifications AS n
         JOIN tracked_flights AS t ON n.flight_id = t.id
-        WHERE t.user_id = ?
+        WHERE t.user_id = %s
         ORDER BY n.notify_time DESC
     """, (user_id,))
     rows = c.fetchall()
+    c.close()
     conn.close()
     
     data = []
@@ -443,29 +440,31 @@ def add_flight():
         if field not in data:
             return jsonify({"error": f"缺少必要欄位：{field}"}), 400
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
 
     # 檢查是否已經追蹤過（同user、同航班號、同出發時間）
     c.execute("""
         SELECT id FROM tracked_flights 
-        WHERE user_id = ? AND flight_number = ? AND depart_time = ?
+        WHERE user_id = %s AND flight_number = %s AND depart_time = %s
     """, (user_id, data["flight_number"], data["depart_time"]))
 
     existing_flight = c.fetchone()
     if existing_flight:
+        c.close()
         conn.close()
         return jsonify({"error": f"您已經追蹤過此航班 {data['flight_number']} 了"}), 409
 
     # 沒追蹤過 加入追蹤
     c.execute("""
         INSERT INTO tracked_flights (from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data["from"], data["to"], data["flight_number"], data["airline"],
         data["depart_time"], data["arrival_time"], data["price"], user_id
     ))
     conn.commit()
+    c.close()
     conn.close()
     
     return jsonify({"message": f"已成功加入追蹤航班 {data['flight_number']}"}), 200
@@ -476,14 +475,15 @@ def add_flight():
 def get_tracked_flights():
     user_id = request.user_id
     
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
         SELECT id, from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price
         FROM tracked_flights
-        WHERE user_id = ?
+        WHERE user_id = %s
     """, (user_id,))
     rows = c.fetchall()
+    c.close()
     conn.close()
     
     flights = []
@@ -505,17 +505,19 @@ def get_tracked_flights():
 @login_required
 def get_price_history(flight_id):
     user_id = request.user_id
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
     
     # 確認這個 flight 是此使用者的
-    c.execute("SELECT 1 FROM tracked_flights WHERE id = ? AND user_id = ?", (flight_id, user_id))
+    c.execute("SELECT 1 FROM tracked_flights WHERE id = %s AND user_id = %s", (flight_id, user_id))
     if not c.fetchone():
+        c.close()
         conn.close()
         return jsonify({"error": "無權查詢此航班或航班不存在"}), 404
     
-    c.execute("SELECT checked_time, price FROM prices WHERE flight_id = ? ORDER BY checked_time ASC", (flight_id,))
+    c.execute("SELECT checked_time, price FROM prices WHERE flight_id = %s ORDER BY checked_time ASC", (flight_id,))
     rows = c.fetchall()
+    c.close()
     conn.close()
     
     if not rows:
@@ -529,11 +531,12 @@ def get_price_history(flight_id):
 @login_required
 def delete_flight(flight_id):
     user_id = request.user_id
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM tracked_flights WHERE id = ? AND user_id = ?", (flight_id, user_id))
+    c.execute("DELETE FROM tracked_flights WHERE id = %s AND user_id = %s", (flight_id, user_id))
     deleted = c.rowcount
     conn.commit()
+    c.close()
     conn.close()
     
     if deleted == 0:
@@ -590,7 +593,7 @@ def fetch_latest_price(from_airport, to_airport, depart_time, return_time, fligh
 
 def scheduled_price_check():
     print("🔄 開始自動檢查票價...")
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     c = conn.cursor()
 
     # 先取得所有 user_id（避免混亂）
@@ -604,7 +607,7 @@ def scheduled_price_check():
         c.execute("""
             SELECT id, from_airport, to_airport, flight_number, depart_time, arrival_time, price
             FROM tracked_flights
-            WHERE user_id = ?
+            WHERE user_id = %s
         """, (user_id,))
         flights = c.fetchall()
 
@@ -621,12 +624,12 @@ def scheduled_price_check():
             # 寫入 price history
             c.execute("""
                 INSERT INTO prices (flight_id, checked_time, price)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """, (flight_id, now, new_price))
             conn.commit()
 
             # 查詢歷史最低價
-            c.execute("SELECT MIN(price) FROM prices WHERE flight_id = ?", (flight_id,))
+            c.execute("SELECT MIN(price) FROM prices WHERE flight_id = %s", (flight_id,))
             min_price = c.fetchone()[0]
 
             if new_price < min_price:
@@ -636,7 +639,7 @@ def scheduled_price_check():
                 # 寫入通知紀錄
                 c.execute("""
                     INSERT INTO notifications (flight_id, message, notify_time, price)
-                    VALUES (?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s)
                 """, (flight_id, message, now, new_price))
                 conn.commit()
                 
@@ -654,12 +657,21 @@ def scheduled_price_check():
     # 排程紀錄（全系統）
     c.execute("""
         INSERT INTO scheduler_logs (time, status)
-        VALUES (?, ?)
+        VALUES (%s, %s)
     """, (datetime.now(timezone.utc).isoformat(), "OK"))
     conn.commit()
+    c.close()
     conn.close()
     
     print("✅ 所有使用者的自動票價更新完成")
+
+def keep_alive():
+    try:
+        url = "https://flightticketproject.onrender.com/" 
+        requests.get(url, timeout=10)
+        print("⛽ 自我喚醒請求成功")
+    except Exception as e:
+        print(f"⚠️ 自我喚醒失敗: {e}")
 
 
 # ==============================================
@@ -668,6 +680,9 @@ def scheduled_price_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
+    
+    # 在啟動伺服器前先檢查並建立資料表
+    init_all_tables()
 
     # 取得當前是否為 Debug 模式
     is_debug = False
@@ -675,9 +690,12 @@ if __name__ == "__main__":
     # 1. 生產環境(debug=False)直接啟動 2. 開發環境(debug=True) 則檢查是否為 Werkzeug 的主進程
     if not is_debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
-        scheduler.add_job(scheduled_price_check, "interval", minutes=5)
+        # 每10分鐘戳自己一下，防止render休眠 (15mins)
+        scheduler.add_job(keep_alive, "interval", minutes=10)
+        # 檢查機票
+        scheduler.add_job(scheduled_price_check, "interval", minutes=60)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
-    # 必須用 socketio.run，而不是 wsgi.server
+    # 用socketio.run 不是 wsgi.server
     socketio.run(app, host="0.0.0.0", port=port, debug=False)
