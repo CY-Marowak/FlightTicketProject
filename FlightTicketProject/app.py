@@ -705,7 +705,7 @@ if __name__ == "__main__":
         # 每11分鐘戳自己一下，防止render休眠 (15mins)
         scheduler.add_job(keep_alive, "interval", minutes=11)
         # 檢查機票
-        scheduler.add_job(scheduled_price_check, "interval", minutes=30)
+        scheduler.add_job(scheduled_price_check, "interval", minutes=60)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
