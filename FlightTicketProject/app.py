@@ -566,10 +566,12 @@ def fetch_latest_price(from_airport, to_airport, depart_time, return_time, fligh
         "departure_id": from_airport,
         "arrival_id": to_airport,
         "outbound_date": normalize_date(depart_time),
-        "return_date": normalize_date(return_time),
         "adults": "1",
-        "currency": "TWD"
+        "currency": "TWD",
+        "trip_type": "one_way" # 提示 API 單程
     }
+    # 確保 flight_number 乾淨，例如 "MM930"
+    target_f_no = flight_number.replace(" ", "").upper().strip()
 
     try:
         res = requests.get(url, headers=headers, params=query, timeout=30)
@@ -578,11 +580,21 @@ def fetch_latest_price(from_airport, to_airport, depart_time, return_time, fligh
             return None
         
         data = res.json()
-        top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
-        for f in top_flights:
-            f_no = f["flights"][0]["flight_number"].replace(" ", "").strip()
-            if f["price"] != "unavailable" and f_no == flight_number:
+        itineraries = data.get("data", {}).get("itineraries", {})
+        
+        # 把所有可能的航班清單合併
+        all_itineraries = (
+            itineraries.get("topFlights", []) + 
+            itineraries.get("otherFlights", [])
+        )
+
+        for f in all_itineraries:
+            f_no = f["flights"][0]["flight_number"].replace(" ", "").upper().strip()
+          
+            # 比對價格與編號
+            if f["price"] != "unavailable" and f_no == target_f_no:
                 return float(f["price"])
+        
         print(f"⚠️ 找不到航班 {flight_number} 的最新票價")
         return None
     
@@ -690,10 +702,10 @@ if __name__ == "__main__":
     # 1. 生產環境(debug=False)直接啟動 2. 開發環境(debug=True) 則檢查是否為 Werkzeug 的主進程
     if not is_debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
-        # 每10分鐘戳自己一下，防止render休眠 (15mins)
-        scheduler.add_job(keep_alive, "interval", minutes=10)
+        # 每11分鐘戳自己一下，防止render休眠 (15mins)
+        scheduler.add_job(keep_alive, "interval", minutes=11)
         # 檢查機票
-        scheduler.add_job(scheduled_price_check, "interval", minutes=60)
+        scheduler.add_job(scheduled_price_check, "interval", minutes=3)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
