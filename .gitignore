@@ -39,6 +39,7 @@ ENV/
 env.bak/
 Scripts/
 pip-wheel-metadata/
+requirements-desktop.txt
 
 # === 🧠 Python Build Artifacts ===
 build/
