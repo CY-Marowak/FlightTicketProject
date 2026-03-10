@@ -128,6 +128,29 @@ def init_all_tables():
         c.close()
         conn.close()
 # ------------------------------------
+# === 刪除所有 PostgreSQL 表格 ===
+def drop_all_tables():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        # 依序刪除（或使用 CASCADE）
+        c.execute("DROP TABLE IF EXISTS prices CASCADE")
+        c.execute("DROP TABLE IF EXISTS notifications CASCADE")
+        c.execute("DROP TABLE IF EXISTS scheduler_logs CASCADE")
+        c.execute("DROP TABLE IF EXISTS tracked_flights CASCADE")
+        c.execute("DROP TABLE IF EXISTS users CASCADE")
+
+        conn.commit()
+        print("🗑️ 所有 PostgreSQL 資料表已刪除")
+
+    except Exception as e:
+        print(f"❌ 刪除資料表失敗: {e}")
+        conn.rollback()
+
+    finally:
+        c.close()
+        conn.close()
+# ------------------------------------
 
 
 # === 正常顯示首頁 ===
@@ -369,9 +392,10 @@ def get_price():
         "departure_id": departure_id,
         "arrival_id": arrival_id,
         "outbound_date": outbound_date,
-        "return_date": return_date,
+        # "return_date": return_date, 不看回程 所有都預設單趟
         "adults": "1",
-        "currency": "TWD"
+        "currency": "TWD",
+        "trip_type": "one_way" # 強制告訴 API 我只要看單程
     }
 
     response = requests.get(url, headers=headers, params=querystring)
@@ -384,18 +408,19 @@ def get_price():
 
     data = response.json()
     try:
-        top_flights = data.get("data", {}).get("itineraries", {}).get("topFlights", [])
-        if not top_flights:
+        itineraries = data.get("data", {}).get("itineraries", {})
+        all_itineraries = itineraries.get("topFlights", []) + itineraries.get("otherFlights", [])
+
+        if not all_itineraries:
             return jsonify({
                 "from": departure_id,
                 "to": arrival_id,
                 "outbound_date": outbound_date,
-                "return_date": return_date,
                 "message": "查無符合的航班資料"
             })
         
         flights = []
-        for f in top_flights:
+        for f in all_itineraries:
             if f["price"] == "unavailable": # 取全部來看 跳過unavailable
                 continue
             flights.append({
@@ -409,7 +434,7 @@ def get_price():
             })
         
             flights.sort(key=lambda x: x["price"])
-        cheapest_flights = flights[:5]
+        cheapest_flights = flights[:10]
         
         return jsonify({
             "from": departure_id,
@@ -693,6 +718,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
+    # 刪除此資料表
+    drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
