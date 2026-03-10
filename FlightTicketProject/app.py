@@ -661,6 +661,15 @@ def scheduled_price_check():
 
             now = datetime.now(timezone.utc).isoformat()
 
+            # 價格變動 更新 tracked_flights 表中的當前價格
+            if new_price != old_price:
+                c.execute("""
+                    UPDATE tracked_flights 
+                    SET price = %s 
+                    WHERE id = %s
+                """, (new_price, flight_id))
+                print(f"📝 {flight_no} 價格已從 {old_price} 更新為 {new_price}")
+
             # 寫入 price history
             c.execute("""
                 INSERT INTO prices (flight_id, checked_time, price)
@@ -668,9 +677,11 @@ def scheduled_price_check():
             """, (flight_id, now, new_price))
             conn.commit()
 
-            # 查詢歷史最低價
+            # 查詢歷史最低價 (用於判斷是否發送低價通知)
             c.execute("SELECT MIN(price) FROM prices WHERE flight_id = %s", (flight_id,))
-            min_price = c.fetchone()[0]
+            min_price_row = c.fetchone()
+            # 預防 min_price 為 None
+            min_price = min_price_row[0] if min_price_row[0] is not None else new_price
 
             if new_price < min_price:
                 message = f"{flight_no} 出現新低價：{new_price} TWD !!!!"
