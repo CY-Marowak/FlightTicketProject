@@ -426,11 +426,11 @@ class FlightApp(QWidget):
         self.to_input = QLineEdit("OKA")
         layout.addWidget(self.to_input)
 
-        layout.addWidget(QLabel("出發日期 (YYYY-MM-DD):"))
+        layout.addWidget(QLabel("出發日期:"))
         self.depart_input = QLineEdit("2026-03-12")
         layout.addWidget(self.depart_input)
 
-        layout.addWidget(QLabel("回程日期 (YYYY-MM-DD):"))
+        layout.addWidget(QLabel("回程日期 (選填):"))
         self.return_input = QLineEdit("2026-03-15")
         layout.addWidget(self.return_input)
 
