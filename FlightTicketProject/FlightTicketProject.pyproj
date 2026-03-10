@@ -29,6 +29,7 @@
   <ItemGroup>
     <Compile Include="app.py" />
     <Compile Include="app_info.py" />
+    <Compile Include="backend_version.py" />
     <Compile Include="flight_gui.py" />
   </ItemGroup>
   <ItemGroup>

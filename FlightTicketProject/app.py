@@ -17,6 +17,9 @@ from psycopg2 import IntegrityError # PostgreSQL 約束錯誤
 import eventlet    
 import eventlet.wsgi
 import logging
+from backend_version import BACKEND_VERSION
+
+print(f"Backend Version: {BACKEND_VERSION}") # 目前後端版本
 
 load_dotenv()  # 載入 .env
 
