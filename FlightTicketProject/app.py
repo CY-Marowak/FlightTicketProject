@@ -491,6 +491,15 @@ def add_flight():
         data["from"], data["to"], data["flight_number"], data["airline"],
         data["depart_time"], data["arrival_time"], data["price"], user_id
     ))
+    flight_id = c.fetchone()[0]
+
+    # 寫入 price history
+    now = datetime.now(timezone.utc).isoformat()
+    c.execute("""
+        INSERT INTO prices (flight_id, checked_time, price)
+        VALUES (%s, %s, %s)
+    """, (flight_id, now, data["price"]))
+    
     conn.commit()
     c.close()
     conn.close()
@@ -733,7 +742,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    drop_all_tables()
+    #drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
