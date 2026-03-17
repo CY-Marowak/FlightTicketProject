@@ -733,7 +733,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    # drop_all_tables()
+    drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
@@ -746,7 +746,7 @@ if __name__ == "__main__":
         # 每11分鐘戳自己一下，防止render休眠 (15mins)
         scheduler.add_job(keep_alive, "interval", minutes=11)
         # 檢查機票
-        scheduler.add_job(scheduled_price_check, "interval", minutes=5)
+        scheduler.add_job(scheduled_price_check, "interval", minutes=60)
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
