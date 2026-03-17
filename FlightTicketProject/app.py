@@ -487,6 +487,7 @@ def add_flight():
     c.execute("""
         INSERT INTO tracked_flights (from_airport, to_airport, flight_number, airline, depart_time, arrival_time, price, user_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
     """, (
         data["from"], data["to"], data["flight_number"], data["airline"],
         data["depart_time"], data["arrival_time"], data["price"], user_id
