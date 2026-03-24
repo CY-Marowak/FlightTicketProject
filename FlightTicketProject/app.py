@@ -73,7 +73,8 @@ def init_all_tables():
                 id SERIAL PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                created_at TEXT
+                created_at TEXT,
+                expo_push_token TEXT
             )
         """)
         
@@ -245,6 +246,7 @@ def login():
     
     username = data.get("username")
     password = data.get("password")
+    push_token = data.get("push_token") # 接收前端傳來的 Token
     
     conn = get_db_connection()
     c = conn.cursor()
@@ -260,6 +262,15 @@ def login():
     
     if not bcrypt.checkpw(password.encode(), password_hash.encode()):
         return jsonify({"error": "密碼錯誤"}), 400
+
+    # 登入成功後，更新 Push Token
+    if push_token:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET expo_push_token = %s WHERE id = %s", (push_token, user_id))
+        conn.commit()
+        cur.close()
+        conn.close()
     
     token = jwt.encode(
         {
@@ -582,6 +593,26 @@ def delete_flight(flight_id):
     
     return jsonify({"message": f"已刪除追蹤航班 ID {flight_id}"}), 200
 
+# ------------------------------------
+# 發送推播
+def send_push_notification(expo_token, title, body):
+    if not expo_token or not expo_token.startswith("ExponentPushToken"):
+        return
+        
+    url = "https://exp.host/--/api/v2/push/send"
+    payload = {
+        "to": expo_token,
+        "title": title,
+        "body": body,
+        "sound": "default",
+        "data": {"type": "price_drop"} # 可以放自訂資料
+    }
+    
+    try:
+        response = requests.post(url, json=payload)
+        print(f"📡 推播發送結果: {response.json()}")
+    except Exception as e:
+        print(f"❌ 推播發送失敗: {e}")
 
 # === 查詢最新票價 ===
 def fetch_latest_price(from_airport, to_airport, depart_time, return_time, flight_number):
@@ -640,7 +671,7 @@ def fetch_latest_price(from_airport, to_airport, depart_time, return_time, fligh
         print(f"⚠️ 抓取票價錯誤: {e}")
         return None
 
-
+# 自動檢查票價
 def scheduled_price_check():
     print("🔄 開始自動檢查票價...")
     conn = get_db_connection()
@@ -743,7 +774,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    #drop_all_tables()
+    drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
