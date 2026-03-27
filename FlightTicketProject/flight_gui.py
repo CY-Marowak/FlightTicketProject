@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import certifi
 import os
 import requests
@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 from app_info import APP_NAME, APP_VERSION
 from dateutil import parser
+from datetime import datetime
 
 def resource_path(relative_path):
     try:
@@ -639,6 +640,10 @@ class FlightApp(QWidget):
     # -------------------------------------------------
     # 加上顯示圖表
     # -------------------------------------------------
+    # 設定中文: Microsoft JhengHei (微軟正黑體)
+    plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei'] 
+    # 解決負號顯示為方塊的問題
+    plt.rcParams['axes.unicode_minus'] = False
     def show_price_chart(self, flight_id, flight_number):
         url = f"{API_URL}/prices/{flight_id}"
         try:
@@ -648,17 +653,26 @@ class FlightApp(QWidget):
                 return
 
             data = response.json()
-            times = [d["time"] for d in data]
-            prices = [d["price"] for d in data]
+            # --- 時間格式化處理 ---
+            times = []
+            prices = []
+            for d in data:
+                dt_utc = datetime.fromisoformat(d["time"].replace('Z', '+00:00'))
+                # 轉換為本地時區 (手機/電腦系統當前的時區)
+                dt_local = dt_utc.astimezone() 
+                display_time = dt_local.strftime("%m/%d %H:%M")
+                times.append(display_time) 
 
-            plt.figure(figsize=(7, 4))
-            plt.plot(times, prices, marker='o', linestyle='-', linewidth=2)
-            plt.title(f"票價變化圖 - {flight_number}")
-            plt.xlabel("查詢時間")
-            plt.ylabel("票價 (TWD)")
-            plt.xticks(rotation=45)
+                prices.append(d["price"])
+
+            plt.figure(figsize=(8, 5))
+            plt.plot(times, prices, marker='o', linestyle='-', linewidth=2, color='#1a73e8')
+            plt.title(f"票價變化圖 - {flight_number}", fontsize=14)
+            plt.xlabel("查詢時間", fontsize=10)
+            plt.ylabel("票價 (TWD)", fontsize=10)
+            plt.xticks(rotation=30, ha='right')
+            plt.grid(True, linestyle='--', alpha=0.7)
             plt.tight_layout()
-            plt.grid(True)
             plt.show()
 
         except Exception as e:
@@ -786,11 +800,15 @@ class FlightApp(QWidget):
                 return
 
             data = res.json()
-            local_time = parser.isoparse(data.get('created_at', '未知')).astimezone()
+            dt_utc = datetime.fromisoformat(data.get('created_at', '未知').replace('Z', '+00:00'))
+            dt_local = dt_utc.astimezone() 
+            display_time = dt_local.strftime("%m/%d %H:%M")
+            #local_time = parser.isoparse(data.get('created_at', '未知')).astimezone()
+            
             text = (
                 f"🆔 使用者 ID：{data.get('user_id', '未知')}\n"
                 f"👤 帳號名稱：{data.get('username', '未知')}\n"
-                f"📅 註冊時間：{local_time}"
+                f"📅 註冊時間：{display_time}"
             )
             self.profile_label.setText(text)
         except Exception as e:
