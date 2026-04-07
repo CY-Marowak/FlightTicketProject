@@ -593,6 +593,17 @@ def delete_flight(flight_id):
     
     return jsonify({"message": f"已刪除追蹤航班 ID {flight_id}"}), 200
 
+# 檢查expo_push_token
+@app.route("/debug/tokens")
+def debug_tokens():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT username, expo_push_token FROM users")
+    users = c.fetchall()
+    c.close()
+    conn.close()
+    return jsonify(users)
+
 # ------------------------------------
 # 發送推播
 def send_push_notification(expo_token, title, body):
@@ -733,6 +744,24 @@ def scheduled_price_check():
                     INSERT INTO notifications (flight_id, message, notify_time, price)
                     VALUES (%s, %s, %s, %s)
                 """, (flight_id, message, now, new_price))
+                #獲取該使用者的 Push Token (新加入)
+                c.execute("""
+                    SELECT u.expo_push_token 
+                    FROM users u
+                    JOIN tracked_flights tf ON tf.user_id = u.id
+                    WHERE tf.id = %s
+                """, (flight_id,))
+
+                result = c.fetchone()
+                user_push_token = result[0] if result else None
+
+                # 發送真正的手機系統通知
+                if user_push_token:
+                    send_push_notification(
+                        user_push_token, 
+                        "💰 降價提醒", 
+                        message
+                    )
                 conn.commit()
                 
                 # 推播到前端 —— 指定 user_id
@@ -774,7 +803,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    drop_all_tables()
+    #drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
