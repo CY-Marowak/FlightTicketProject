@@ -97,7 +97,7 @@ def init_all_tables():
         c.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
-                flight_id INTEGER,
+                flight_id INTEGER REFERENCES tracked_flights(id) ON DELETE CASCADE,
                 notify_time TEXT,
                 price DOUBLE PRECISION,
                 message TEXT
@@ -117,7 +117,7 @@ def init_all_tables():
         c.execute("""
             CREATE TABLE IF NOT EXISTS prices (
                 id SERIAL PRIMARY KEY,
-                flight_id INTEGER REFERENCES tracked_flights(id),
+                flight_id INTEGER REFERENCES tracked_flights(id) ON DELETE CASCADE,
                 checked_time TEXT,
                 price DOUBLE PRECISION
             )
@@ -774,7 +774,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    #drop_all_tables()
+    drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
