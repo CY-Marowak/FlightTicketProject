@@ -6,9 +6,10 @@ import socketio
 from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView, QTabWidget, QHBoxLayout
+    QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView, QTabWidget,
+    QHBoxLayout, QDateEdit, QCheckBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon
 from matplotlib import pyplot as plt
 from pathlib import Path
@@ -428,12 +429,30 @@ class FlightApp(QWidget):
         layout.addWidget(self.to_input)
 
         layout.addWidget(QLabel("出發日期:"))
-        self.depart_input = QLineEdit("2026-03-12")
+        self.depart_input = QDateEdit()
+        self.depart_input.setCalendarPopup(True)  # 啟用行事曆彈窗
+        self.depart_input.setDate(QDate.currentDate()) # 預設今天
+        self.depart_input.setMinimumDate(QDate.currentDate()) # 禁止選過去
+        self.depart_input.setDisplayFormat("yyyy-MM-dd") # 設定顯示格式
         layout.addWidget(self.depart_input)
 
         layout.addWidget(QLabel("回程日期 (選填):"))
-        self.return_input = QLineEdit("2026-03-15")
-        layout.addWidget(self.return_input)
+        # 建立一個水平佈局，把 CheckBox 和 DateEdit 放在同一行
+        return_layout = QHBoxLayout()
+        self.return_enable_check = QCheckBox("啟用回程查詢")
+        self.return_enable_check.setChecked(False) # 預設不勾選
+    
+        self.return_input = QDateEdit()
+        self.return_input.setCalendarPopup(True)
+        self.return_input.setDate(QDate.currentDate().addDays(3))
+        self.return_input.setDisplayFormat("yyyy-MM-dd")
+        self.return_input.setEnabled(False) # 預設禁用，因為沒勾選 CheckBox
+        # 當 CheckBox 狀態改變，就切換 DateEdit 的可用狀態
+        self.return_enable_check.toggled.connect(self.return_input.setEnabled)
+    
+        return_layout.addWidget(self.return_enable_check)
+        return_layout.addWidget(self.return_input)
+        layout.addLayout(return_layout)
 
         # 查詢按鈕
         self.search_btn = QPushButton("查詢航班")
@@ -515,8 +534,14 @@ class FlightApp(QWidget):
     def search_flights(self):
         from_airport = self.from_input.text().strip()
         to_airport = self.to_input.text().strip()
-        depart_date = self.depart_input.text().strip()
-        return_date = self.return_input.text().strip()
+        # 將日期轉為字串 YYYY-MM-DD
+        depart_date = self.depart_input.date().toString("yyyy-MM-dd")
+        # --- 判斷回程是否啟用 ---
+        if self.return_enable_check.isChecked():
+            return_date = self.return_input.date().toString("yyyy-MM-dd")
+        else:
+            return_date = None  # 或者根據你的 API 需求設為 "" 或不傳
+
 
         url = f"{API_URL}/price?from={from_airport}&to={to_airport}&depart={depart_date}&return={return_date}"
 
