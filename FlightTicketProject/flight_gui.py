@@ -7,10 +7,10 @@ from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView, QTabWidget,
-    QHBoxLayout, QDateEdit, QCheckBox
+    QHBoxLayout, QDateEdit, QCheckBox, QFrame
 )
-from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QDate, QUrl
+from PyQt5.QtGui import QIcon, QDesktopServices
 from matplotlib import pyplot as plt
 from pathlib import Path
 from app_info import APP_NAME, APP_VERSION
@@ -45,6 +45,7 @@ def app_data_dir():
         return Path.home() / ".flight_ticket_tracker"
 
 
+# --- 主類別 ---
 class FlightApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -413,29 +414,100 @@ class FlightApp(QWidget):
             print(f"🔌 SocketIO connected: {event_name}")
         except Exception as e:
             print("❌ SocketIO 連線錯誤：", e)
-
+                
     # -------------------------------------------------
     # 查詢航班分頁
     # -------------------------------------------------
     def init_query_tab(self):
         layout = QVBoxLayout()
 
+        # --- 頂部標題與外部連結 ---
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("查詢航班"))
+    
+        link_btn = QPushButton("✈️ 機場名稱對照表")
+        link_btn.setFlat(True) # 設為扁平化，看起來像超連結
+        link_btn.setStyleSheet("color: blue; text-decoration: underline;")
+        link_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://www.como.com.tw/html_information/airportcode.htm")))
+        header_layout.addStretch()
+        header_layout.addWidget(link_btn)
+        layout.addLayout(header_layout)
+
+        # 機場清單資料
+        COMMON_AIRPORTS = [
+            ("TPE", "桃園"), ("NRT", "成田"), ("HND", "羽田"), ("KIX", "關西"), ("OKA", "沖繩"), 
+            ("PUS", "釜山"), ("HKG", "香港"), ("LAX", "洛杉磯")
+        ]
+
+        # --- 出發機場 ---
         layout.addWidget(QLabel("出發機場代碼 (e.g. TPE):"))
         self.from_input = QLineEdit("TPE")
+        self.from_input.setPlaceholderText("請輸入三字碼")
         layout.addWidget(self.from_input)
 
+        # 加入出發常用標籤佈局
+        from_tag_container = QWidget()
+        from_tag_layout = QHBoxLayout(from_tag_container)
+        from_tag_layout.setContentsMargins(0, 0, 0, 0) # 讓間距緊湊一點
+
+        for code, name in COMMON_AIRPORTS:
+            btn = QPushButton(f"{code} {name}")
+            btn.setFixedWidth(80)
+            btn.setStyleSheet("""
+                QPushButton {
+                    font-size: 10px; 
+                    background-color: #f0f0f0; 
+                    border-radius: 10px; 
+                    padding: 2px;
+                    border: 1px solid #ddd;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            btn.clicked.connect(lambda _, c=code: self.from_input.setText(c))
+            from_tag_layout.addWidget(btn)
+
+        from_tag_layout.addStretch() # 把按鈕全部推向左邊
+        layout.addWidget(from_tag_container)
+
+        # --- 抵達機場 ---
         layout.addWidget(QLabel("抵達機場代碼 (e.g. OKA):"))
         self.to_input = QLineEdit("OKA")
         layout.addWidget(self.to_input)
+        # 加入抵達常用標籤佈局
+        to_tag_layout = QHBoxLayout()
+        for code, name in COMMON_AIRPORTS:
+            btn = QPushButton(f"{code} {name}")
+            btn.setFixedWidth(80)
+            btn.setStyleSheet("""
+                QPushButton {
+                    font-size: 10px; 
+                    background-color: #f0f0f0; 
+                    border-radius: 10px; 
+                    padding: 2px;
+                    border: 1px solid #ddd;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+            """)
+            btn.clicked.connect(lambda _, c=code: self.to_input.setText(c))
+            to_tag_layout.addWidget(btn)
+        to_tag_layout.addStretch()
+        layout.addLayout(to_tag_layout)
 
+        # --- 出發日期 ---
         layout.addWidget(QLabel("出發日期:"))
         self.depart_input = QDateEdit()
         self.depart_input.setCalendarPopup(True)  # 啟用行事曆彈窗
         self.depart_input.setDate(QDate.currentDate()) # 預設今天
         self.depart_input.setMinimumDate(QDate.currentDate()) # 禁止選過去
         self.depart_input.setDisplayFormat("yyyy-MM-dd") # 設定顯示格式
+        self.depart_input.setCursor(Qt.PointingHandCursor) # 讓滑鼠游標變成手指
         layout.addWidget(self.depart_input)
 
+        # --- 回程日期 ---
         layout.addWidget(QLabel("回程日期 (選填):"))
         # 建立一個水平佈局，把 CheckBox 和 DateEdit 放在同一行
         return_layout = QHBoxLayout()
@@ -449,6 +521,7 @@ class FlightApp(QWidget):
         self.return_input.setEnabled(False) # 預設禁用，因為沒勾選 CheckBox
         # 當 CheckBox 狀態改變，就切換 DateEdit 的可用狀態
         self.return_enable_check.toggled.connect(self.return_input.setEnabled)
+        self.return_input.setCursor(Qt.PointingHandCursor) # 讓滑鼠游標變成手指
     
         return_layout.addWidget(self.return_enable_check)
         return_layout.addWidget(self.return_input)
