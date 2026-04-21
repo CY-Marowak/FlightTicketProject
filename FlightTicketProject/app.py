@@ -97,7 +97,7 @@ def init_all_tables():
         c.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
-                flight_id INTEGER REFERENCES tracked_flights(id) ON DELETE CASCADE,
+                flight_id INTEGER REFERENCES tracked_flights(id) ON DELETE SET NULL,
                 notify_time TEXT,
                 price DOUBLE PRECISION,
                 message TEXT
@@ -708,22 +708,29 @@ def scheduled_price_check():
 
         for f in flights:
             flight_id, from_a, to_a, flight_no, depart, arrive, old_price = f
-            
+            now = datetime.now(timezone.utc).isoformat()
+
             # 檢查航班是否過期
             if depart < today_str:
-                print(f"🗑️ 航班 {flight_no} 已過期 ({depart})，正在從資料庫移除...")
-                # 刪除 tracked_flights，對應的 prices 會因 ON DELETE CASCADE 自動刪除
-                #c.execute("DELETE FROM tracked_flights WHERE id = %s", (flight_id,))
-                #conn.commit()
-                #continue # 跳過此航班，不進行後續 API 價格查詢
+                print(f"🗑️ 航班 {flight_no} 已過期，正在進行最後紀錄並移除...")
+    
+                # 1. 寫入最後一則通知訊息
+                expiry_msg = f"系統通知：航班 {flight_no} ({from_a} -> {to_a}) 已於 {depart} 出發，追蹤任務結束。"
+                c.execute("""
+                    INSERT INTO notifications (flight_id, message, notify_time, price)
+                    VALUES (%s, %s, %s, %s)
+                """, (flight_id, expiry_msg, now, old_price))
+    
+                # 2. 執行刪除
+                c.execute("DELETE FROM tracked_flights WHERE id = %s", (flight_id,))
+                conn.commit()
+                continue
             
             new_price = fetch_latest_price(from_a, to_a, depart, arrive, flight_no)
             
             if new_price is None:
                 print(f"⚠️ {flight_no}（user {user_id}）票價更新失敗")
                 continue
-
-            now = datetime.now(timezone.utc).isoformat()
 
             # 查詢歷史最低價 (用於判斷是否發送低價通知)
             c.execute("SELECT MIN(price) FROM prices WHERE flight_id = %s", (flight_id,))
@@ -748,7 +755,7 @@ def scheduled_price_check():
                 print(f"📝 {flight_no} 價格已從 {old_price} 更新為 {new_price}")
             
             if new_price < min_price:
-                message = f"{flight_no} 從 {from_a} 至 {to_a} 出發時間:{depart} 出現新低價：{new_price} TWD "
+                message = f"{flight_no} ({from_a} -> {to_a}) (出發時間: {depart}) 出現新低價: {new_price} TWD "
                 print(f"💰 User {user_id} | {message}")
                 
                 # 寫入通知紀錄
@@ -815,7 +822,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    #drop_all_tables()
+    drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
