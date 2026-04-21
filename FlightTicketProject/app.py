@@ -625,14 +625,9 @@ def send_push_notification(expo_token, title, body):
     except Exception as e:
         print(f"❌ 推播發送失敗: {e}")
 
-# == 標準時間 ==
+# == 標準日期 ==
 def normalize_date(dt):
-    try:
-        return datetime.strptime(dt[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
-    except Exception:
-        # 假如格式像 2026-3-12，補零
-        parts = dt.split(" ")[0].split("-")
-        return f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+    return datetime.strptime(dt.split()[0], "%Y-%m-%d").date()
 
 # === 查詢最新票價 ===
 def fetch_latest_price(from_airport, to_airport, depart_time, return_time, flight_number):
