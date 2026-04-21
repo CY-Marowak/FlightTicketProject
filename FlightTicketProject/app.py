@@ -625,17 +625,19 @@ def send_push_notification(expo_token, title, body):
     except Exception as e:
         print(f"❌ 推播發送失敗: {e}")
 
+# == 標準時間 ==
+def normalize_date(dt):
+    try:
+        return datetime.strptime(dt[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
+    except Exception:
+        # 假如格式像 2026-3-12，補零
+        parts = dt.split(" ")[0].split("-")
+        return f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+
 # === 查詢最新票價 ===
 def fetch_latest_price(from_airport, to_airport, depart_time, return_time, flight_number):
     # 清理航班編號與日期格式
     flight_number = flight_number.replace(" ", "").strip()
-    def normalize_date(dt):
-        try:
-            return datetime.strptime(dt[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
-        except Exception:
-            # 假如格式像 2026-3-12，補零
-            parts = dt.split(" ")[0].split("-")
-            return f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
 
     url = f"https://{RAPIDAPI_HOST}/api/v1/searchFlights"
     headers = {
@@ -690,6 +692,7 @@ def scheduled_price_check():
 
     # 取得今天的日期 (格式需與資料庫中的 depart 格式一致，假設為 yyyy-MM-dd)
     today_str = date.today().isoformat()
+    print(f"今天日期: {today_str}")
 
     # 先取得所有 user_id
     c.execute("SELECT DISTINCT user_id FROM tracked_flights WHERE user_id IS NOT NULL")
@@ -711,7 +714,9 @@ def scheduled_price_check():
             now = datetime.now(timezone.utc).isoformat()
 
             # 檢查航班是否過期
-            if depart < today_str:
+            fdate=normalize_date(depart)
+            print(f"{flight_no} 出發日期: {fdate}")
+            if fdate < today_str:
                 print(f"🗑️ 航班 {flight_no} 已過期，正在進行最後紀錄並移除...")
     
                 # 1. 寫入最後一則通知訊息
@@ -755,7 +760,10 @@ def scheduled_price_check():
                 print(f"📝 {flight_no} 價格已從 {old_price} 更新為 {new_price}")
             
             if new_price < min_price:
-                message = f"{flight_no} ({from_a} -> {to_a}) (出發時間: {depart}) 出現新低價: {new_price} TWD "
+                message = f""""
+                    {flight_no} 出現新低價: {new_price} TWD
+                    {from_a} -> {to_a} | 出發日期: {depart}
+                    """
                 print(f"💰 User {user_id} | {message}")
                 
                 # 寫入通知紀錄
