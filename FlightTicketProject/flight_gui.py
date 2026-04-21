@@ -574,17 +574,15 @@ class FlightApp(QWidget):
         layout.addWidget(refresh_btn)
 
         self.notify_table = QTableWidget()
-        self.notify_table.setColumnCount(3)
-        self.notify_table.setHorizontalHeaderLabels(["時間", "價格", "訊息"])
+        self.notify_table.setColumnCount(2)
+        self.notify_table.setHorizontalHeaderLabels(["時間", "訊息"])
         
-        # 前2欄固定寬度
+        # 固定寬度
         self.notify_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)   # 時間 
-        self.notify_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)   # 價格
         # 最後一欄自動撐滿剩餘空間
-        self.notify_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.notify_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
       
         self.notify_table.setColumnWidth(0, 160)
-        self.notify_table.setColumnWidth(1, 160)
         
         layout.addWidget(self.notify_table)
         self.notify_tab.setLayout(layout)
@@ -830,8 +828,7 @@ class FlightApp(QWidget):
                 display_time = dt_local.strftime("%m/%d %H:%M")
 
                 self.notify_table.setItem(i, 0, QTableWidgetItem(display_time))
-                self.notify_table.setItem(i, 1, QTableWidgetItem(str(n["price"])))
-                self.notify_table.setItem(i, 2, QTableWidgetItem(n["message"]))
+                self.notify_table.setItem(i, 1, QTableWidgetItem(n["message"]))
 
         except Exception as e:
             QMessageBox.critical(self, "錯誤", f"無法載入通知紀錄: {e}")
