@@ -736,7 +736,7 @@ def scheduled_price_check():
                 print(f"📝 {flight_no} 價格已從 {old_price} 更新為 {new_price}")
             
             if new_price < min_price:
-                message = f"{flight_no} 出現新低價：{new_price} TWD "
+                message = f"{flight_no} 從 {from_a} 至 {to_a} 出發時間:{depart} 出現新低價：{new_price} TWD "
                 print(f"💰 User {user_id} | {message}")
                 
                 # 寫入通知紀錄
