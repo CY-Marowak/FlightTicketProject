@@ -575,7 +575,7 @@ class FlightApp(QWidget):
 
         self.notify_table = QTableWidget()
         self.notify_table.setColumnCount(2)
-        self.notify_table.setHorizontalHeaderLabels(["時間", "訊息"])
+        self.notify_table.setHorizontalHeaderLabels(["通知時間", "訊息"])
         
         # 固定寬度
         self.notify_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)   # 時間 

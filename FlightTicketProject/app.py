@@ -8,7 +8,7 @@ import psycopg2
 #import sqlite3
 import bcrypt
 import jwt
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
@@ -688,7 +688,10 @@ def scheduled_price_check():
     conn = get_db_connection()
     c = conn.cursor()
 
-    # 先取得所有 user_id（避免混亂）
+    # 取得今天的日期 (格式需與資料庫中的 depart 格式一致，假設為 yyyy-MM-dd)
+    today_str = date.today().isoformat()
+
+    # 先取得所有 user_id
     c.execute("SELECT DISTINCT user_id FROM tracked_flights WHERE user_id IS NOT NULL")
     all_users = [row[0] for row in c.fetchall()]
 
@@ -705,6 +708,15 @@ def scheduled_price_check():
 
         for f in flights:
             flight_id, from_a, to_a, flight_no, depart, arrive, old_price = f
+            
+            # 檢查航班是否過期
+            if depart < today_str:
+                print(f"🗑️ 航班 {flight_no} 已過期 ({depart})，正在從資料庫移除...")
+                # 刪除 tracked_flights，對應的 prices 會因 ON DELETE CASCADE 自動刪除
+                #c.execute("DELETE FROM tracked_flights WHERE id = %s", (flight_id,))
+                #conn.commit()
+                #continue # 跳過此航班，不進行後續 API 價格查詢
+            
             new_price = fetch_latest_price(from_a, to_a, depart, arrive, flight_no)
             
             if new_price is None:
@@ -784,7 +796,7 @@ def scheduled_price_check():
     c.close()
     conn.close()
     
-    print("✅ 所有使用者的自動票價更新完成")
+    print("✅ 所有使用者的自動票價更新與過期清理完成")
 
 def keep_alive():
     try:
