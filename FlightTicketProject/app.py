@@ -822,7 +822,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    drop_all_tables()
+    #drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
