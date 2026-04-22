@@ -627,7 +627,7 @@ def send_push_notification(expo_token, title, body):
 
 # == 標準日期 ==
 def normalize_date(dt):
-    return datetime.strptime(dt.split()[0], "%Y-%m-%d").date()
+    return datetime.strptime(dt.split()[0], "%Y-%m-%d").strftime("%Y-%m-%d")
 
 # === 查詢最新票價 ===
 def fetch_latest_price(from_airport, to_airport, depart_time, return_time, flight_number):
