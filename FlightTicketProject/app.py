@@ -97,6 +97,7 @@ def init_all_tables():
         c.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 flight_id INTEGER REFERENCES tracked_flights(id) ON DELETE SET NULL,
                 notify_time TEXT,
                 price DOUBLE PRECISION,
@@ -367,12 +368,12 @@ def get_notifications():
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
-        SELECT n.id, n.flight_id, n.message, n.notify_time, n.price
-        FROM notifications AS n
-        JOIN tracked_flights AS t ON n.flight_id = t.id
-        WHERE t.user_id = %s
-        ORDER BY n.notify_time DESC
+        SELECT id, flight_id, message, notify_time, price
+        FROM notifications
+        WHERE user_id = %s
+        ORDER BY notify_time DESC
     """, (user_id,))
+
     rows = c.fetchall()
     c.close()
     conn.close()
@@ -709,17 +710,15 @@ def scheduled_price_check():
             now = datetime.now(timezone.utc).isoformat()
 
             # 檢查航班是否過期
-            fdate=normalize_date(depart)
-            print(f"{flight_no} 出發日期: {fdate}")
-            if fdate < today_str:
+            if normalize_date(depart) < today_str:
                 print(f"🗑️ 航班 {flight_no} 已過期，正在進行最後紀錄並移除...")
     
                 # 1. 寫入最後一則通知訊息
                 expiry_msg = f"系統通知：航班 {flight_no} ({from_a} -> {to_a}) 已於 {depart} 出發，追蹤任務結束。"
                 c.execute("""
-                    INSERT INTO notifications (flight_id, message, notify_time, price)
-                    VALUES (%s, %s, %s, %s)
-                """, (flight_id, expiry_msg, now, old_price))
+                    INSERT INTO notifications (flight_id, user_id, message, notify_time, price)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (flight_id, user_id, expiry_msg, now, old_price))
     
                 # 2. 執行刪除
                 c.execute("DELETE FROM tracked_flights WHERE id = %s", (flight_id,))
@@ -763,9 +762,9 @@ def scheduled_price_check():
                 
                 # 寫入通知紀錄
                 c.execute("""
-                    INSERT INTO notifications (flight_id, message, notify_time, price)
-                    VALUES (%s, %s, %s, %s)
-                """, (flight_id, message, now, new_price))
+                    INSERT INTO notifications (flight_id, user_id, message, notify_time, price)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (flight_id, user_id, message, now, new_price))
                 #獲取該使用者的 Push Token (新加入)
                 c.execute("""
                     SELECT u.expo_push_token 
@@ -825,7 +824,7 @@ if __name__ == "__main__":
     print(f"🚀 使用 eventlet 啟動 SocketIO Server，埠號：{port}")
     
     # 刪除資料表
-    #drop_all_tables()
+    drop_all_tables()
     # 在啟動伺服器前先檢查並建立資料表
     init_all_tables()
 
