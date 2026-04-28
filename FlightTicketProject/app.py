@@ -754,9 +754,9 @@ def scheduled_price_check():
                 print(f"📝 {flight_no} 價格已從 {old_price} 更新為 {new_price}")
             
             if new_price < min_price:
-                message = f""""
+                message = f"""
                     {flight_no} 出現新低價: {new_price} TWD
-                    {from_a} -> {to_a} | 出發日期: {depart}
+                    ({from_a} -> {to_a} | 出發日期: {depart})
                     """
                 print(f"💰 User {user_id} | {message}")
                 
@@ -841,5 +841,5 @@ if __name__ == "__main__":
         scheduler.start()
         print("🕒 APScheduler 已啟動")
 
-    # 用socketio.run 不是 wsgi.server
+    # 用socketio.run
     socketio.run(app, host="0.0.0.0", port=port, debug=False)
