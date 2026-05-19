@@ -6,7 +6,7 @@ A flight ticket tracker that tracks the flight prices from time to time and noti
 
 [System Architecture](diagram/System Architecture.drawio)
 
-[System Architecture](diagram/System Architecture.drawio)
+[d](3end diagram.md)
 
 ```mermaid
 flowchart TB
