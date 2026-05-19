@@ -4,6 +4,10 @@ A flight ticket tracker that tracks the flight prices from time to time and noti
 
 ## How It Works
 
+<a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://raw.githubusercontent.com/<CY_Marowak>/<FlightTicketProject>/diagram/System%20Architecture.svg">
+  <img src="diagram/System%20Architecture.svg" alt="System Architecture" width="100%">
+</a>
+
 [查看系統架構圖](diagram/System%20Architecture.svg)
 
 ## Requirements
