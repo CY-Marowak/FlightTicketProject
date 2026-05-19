@@ -34,9 +34,3 @@ https://flightticketwebproject.onrender.com/login
 ## Desktop Installation
 
 ## Mobile Installation
-
-   - Organizes information in a clear, readable format
-
-## License
-
-MIT License - feel free to use and modify as needed.
