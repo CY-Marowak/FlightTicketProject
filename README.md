@@ -8,8 +8,6 @@ A flight ticket tracker that tracks the flight prices from time to time and noti
   <img src="diagram/System%20Architecture.svg" alt="System Architecture" width="100%">
 </a>
 
-[查看系統架構圖](diagram/System%20Architecture.svg)
-
 ## Requirements
 
 - Node.js environment
