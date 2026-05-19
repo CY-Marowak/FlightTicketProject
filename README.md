@@ -3,7 +3,7 @@
 A flight ticket tracker that tracks the flight prices from time to time and notifies user while lower prices.
 
 ## How It Works
-[System Architecture] (../diagram/System Architecture.drawio)
+[System Architecture] (diagram/System Architecture.drawio)
 
 
 ```mermaid
