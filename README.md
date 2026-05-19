@@ -1,6 +1,6 @@
 # Flight Ticket Tracker
 
-A flight ticket tracker that tracks the flight prices from time to time and notifies user while prices are lower.
+An application that tracks the flight prices from time to time and notifies user while prices are lower.
 
 ## How It Works
 
