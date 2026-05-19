@@ -1,6 +1,7 @@
 # Flight Ticket Tracker
 
 An application that tracks the flight prices from time to time and notifies user while prices are lower.
+There are three ends (Desktop, Web and Mobile) for users.
 
 ## How It Works
 
@@ -8,52 +9,18 @@ An application that tracks the flight prices from time to time and notifies user
   <img src="diagram/System%20Architecture.svg" alt="System Architecture" width="100%">
 </a>
 
+<br>
+
 <a href="https://viewer.diagrams.net/?lightbox=1&ui=dark&?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Bussiness%20Logic%20flow.svg">
   <img src="diagram/Bussiness%20Logic%20flow.svg" alt="System Architecture" width="100%">
 </a>
 
-## Requirements
 
-- Node.js environment
-- API keys for:
-  - Firecrawl API (for web search and content extraction)
-  - OpenAI API (for o3 mini model)
+## 
 
-## Setup
+## Desktop Installation
 
-### Node.js
-
-1. Clone the repository
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Set up environment variables in a `.env.local` file:
-
-```bash
-FIRECRAWL_KEY="your_firecrawl_key"
-# If you want to use your self-hosted Firecrawl, add the following below:
-# FIRECRAWL_BASE_URL="http://localhost:3002"
-
-OPENAI_KEY="your_openai_key"
-```
-
-To use local LLM, comment out `OPENAI_KEY` and instead uncomment `OPENAI_ENDPOINT` and `OPENAI_MODEL`:
-- Set `OPENAI_ENDPOINT` to the address of your local server (eg."http://localhost:1234/v1")
-- Set `OPENAI_MODEL` to the name of the model loaded in your local server.
-
-### Docker
-
-1. Clone the repository
-2. Rename `.env.example` to `.env.local` and set your API keys
-
-3. Run the Docker image:
-
-```bash
-docker compose run --rm deep-research
-```
+### 
 
 ## Usage
 
