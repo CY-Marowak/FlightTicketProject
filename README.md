@@ -4,7 +4,7 @@ A flight ticket tracker that tracks the flight prices from time to time and noti
 
 ## How It Works
 
-
+[查看系統架構圖](diagram/System%20Architecture.svg)
 
 ## Requirements
 
