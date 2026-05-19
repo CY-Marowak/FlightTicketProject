@@ -4,7 +4,7 @@ A flight ticket tracker that tracks the flight prices from time to time and noti
 
 ## How It Works
 
-[System Architecture](diagram/ System Architecture.drawio)
+[System Architecture](diagram/System Architecture.drawio)
 
 [3end diagram](3end diagram.md)
 
