@@ -3,7 +3,9 @@
 A flight ticket tracker that tracks the flight prices from time to time and notifies user while lower prices.
 
 ## How It Works
-[diagram/System Architecture.drawio] (#System Architecture)
+[System Architecture] (../diagram/System Architecture.drawio)
+
+
 ```mermaid
 flowchart TB
     subgraph Input
