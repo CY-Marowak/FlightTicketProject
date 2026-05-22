@@ -23,12 +23,16 @@ There are three ends (Desktop, Web and Mobile) for users.
   <img src="diagram/Bussiness%20Logic%20flow.svg" alt="Bussiness Logic flow" width="100%">
 </a>
 
-## Web
+## Web version
 
 https://flightticketwebproject.onrender.com/login
 
-## Desktop Installation
+## Desktop version Installation
 
-## Mobile Installation
+1. Go to [GitHub Releases](https://github.com/CY-Marowak/FlightTicketProject/releases).
+2. Download the latest version of "FlightTicketTracker.exe".
+3. Click "FlightTicketTracker.exe" to start.
+
+## Mobile version Installation
 
 
