@@ -35,4 +35,5 @@ https://flightticketwebproject.onrender.com/login
 
 ## Mobile version Installation
 
+1. https://expo.dev/accounts/caydenyang/projects/FlightTicketMobile/builds/a3140929-a3cd-44f7-9a21-6a5d665a9ec2
 
