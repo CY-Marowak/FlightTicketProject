@@ -25,7 +25,7 @@ There are three version (Desktop, Web and Mobile) for users.
 
 ## Web version
 
-https://flightticketwebproject.onrender.com/login
+https://flightticketwebproject.onrender.com/
 
 ## Desktop version Installation
 
