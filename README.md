@@ -40,4 +40,4 @@ https://flightticketwebproject.onrender.com/
 2. Click the latest "Mobile" Version.
 3. Open the link and click install.
 4. Scan the QR code and download the app.
-5. Open "FlightTicketMobile" on your phone.
+5. Open "FlightTicketMobile" on your phone to start.
