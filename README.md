@@ -30,10 +30,14 @@ https://flightticketwebproject.onrender.com/login
 ## Desktop version Installation
 
 1. Go to [GitHub Releases](https://github.com/CY-Marowak/FlightTicketProject/releases).
-2. Download the latest version of "FlightTicketTracker.exe".
-3. Click "FlightTicketTracker.exe" to start.
+2. Click the latest "Desktop" Version.
+3. Open assets and download "FlightTicketTracker.exe".
+4. Click "FlightTicketTracker.exe" on your desktop to start.
 
 ## Mobile version Installation
 
-1. https://expo.dev/accounts/caydenyang/projects/FlightTicketMobile/builds/a3140929-a3cd-44f7-9a21-6a5d665a9ec2
-
+1. Go to [GitHub Releases](https://github.com/CY-Marowak/FlightTicketProject/releases).
+2. Click the latest "Mobile" Version.
+3. Open the link and click install.
+4. Scan the QR code and download the app.
+5. Open "FlightTicketMobile" on your phone.
