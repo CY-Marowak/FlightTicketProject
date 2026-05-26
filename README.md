@@ -29,8 +29,8 @@ There are three version (Desktop, Web and Mobile) for users.
 
 ## Tech Stack & Technical Highlights
 ### Backend & Infrastructure
-* **Flask & Python**: Built a RESTful API backend serving three distinct client platforms.
-* **APScheduler & Automation**: Implemented a background cron-job running every 10 minutes to fetch live flight data via **RapidAPI**, drastically reducing manual tracking effort.
+* **Flask & Python**: Built a RESTful API backend serving three different client platforms.
+* **APScheduler & Automation**: Implemented a background cron-job running every 10 minutes to fetch live flight data via **RapidAPI**.
 * **Database Optimization**: Designed a PostgreSQL schema leveraging `ON DELETE SET NULL` constraints to automatically clean up expired flight schedules while preserving users' historical price alert logs.
 * **FCM & Real-time Sync**: Integrated **Firebase Cloud Messaging (FCM)** for mobile push notifications and **Socket.io** for real-time web UI updates.
 
