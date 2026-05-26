@@ -11,6 +11,8 @@ config.json
 credentials.json
 token.json
 token.txt
+/FlightTicketProject/instance
+
 
 # === 🐍 Python / Flask / FastAPI / PyQt5 ===
 __pycache__/
@@ -27,6 +29,7 @@ __pycache__/
 *.sqlite
 *.sqlite3
 *.sqlite-journal
+.pyproj
 flights.db
 
 # === 🧰 Virtual Environments ===
@@ -40,6 +43,8 @@ env.bak/
 Scripts/
 pip-wheel-metadata/
 requirements-desktop.txt
+/FlightTicketProject/obj
+/FlightTicketProject/version_info.txt
 
 # === 🧠 Python Build Artifacts ===
 build/
