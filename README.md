@@ -40,21 +40,37 @@ There are three version (Desktop, Web and Mobile) for users.
 * **Mobile (React Native & Expo)**: Developed a cross-platform mobile app utilizing **Expo Secure Store (iOS Keychain / Android KeyStore)** for JWT token storage.
 
 ---
-## Web version
+## How to use
+### Web version
 
 https://flightticketwebproject.onrender.com/
 
-## Desktop version Installation
+### Desktop version Installation
 
 1. Go to [GitHub Releases](https://github.com/CY-Marowak/FlightTicketProject/releases).
 2. Click the latest "Desktop" Version.
 3. Open assets and download "FlightTicketTracker.exe".
 4. Click "FlightTicketTracker.exe" on your desktop to start.
 
-## Mobile version Installation
+### Mobile version Installation
 
 1. Go to [GitHub Releases](https://github.com/CY-Marowak/FlightTicketProject/releases).
 2. Click the latest "Mobile" Version.
 3. Open the link and click install.
 4. Scan the QR code and download the app.
 5. Open "FlightTicketMobile" on your phone to start.
+
+---
+
+## Code
+
+### Desktop version
+
+
+### Web version
+
+https://github.com/CY-Marowak/FlightTicketWebProject
+
+### Mobile 
+
+https://github.com/CY-Marowak/FlightTicketMobile
