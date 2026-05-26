@@ -18,7 +18,7 @@ There are three version (Desktop, Web and Mobile) for users.
 
 <br>
 
-### Bussiness Logic Flow:
+### Business Logic Flow:
 <a href="https://viewer.diagrams.net/?lightbox=1&ui=dark&?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Bussiness%20Logic%20flow.svg">
   <img src="diagram/Bussiness%20Logic%20flow.svg" alt="Bussiness Logic flow" width="100%">
 </a>
