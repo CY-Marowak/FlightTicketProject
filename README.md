@@ -29,15 +29,15 @@ There are three version (Desktop, Web and Mobile) for users.
 
 ## Tech Stack & Technical Highlights
 ### Backend & Infrastructure
-* **Flask & Python**: Built a RESTful API backend serving three different client platforms.
+* **Flask & Python**: Built a RESTful API backend serving three different client platforms on **Render Web Service**.
 * **APScheduler & Automation**: Implemented a background cron-job running every 10 minutes to fetch live flight data via **RapidAPI**.
-* **Database Optimization**: Designed a PostgreSQL schema leveraging `ON DELETE SET NULL` constraints to automatically clean up expired flight schedules while preserving users' historical price alert logs.
+* **Database Optimization**: Designed a PostgreSQL schema leveraging `ON DELETE SET NULL` constraints to automatically clean up expired flight schedules while preserving users' historical price alert logs on **Render PostgreSQL**.
 * **FCM & Real-time Sync**: Integrated **Firebase Cloud Messaging (FCM)** for mobile push notifications and **Socket.io** for real-time web UI updates.
 
 ### Frontend & Clients
-* **Web (React & TypeScript)**: Built a responsive dashboard featuring historical price charts.
-* **Mobile (React Native & Expo)**: Developed a cross-platform mobile app utilizing **Expo Secure Store (iOS Keychain / Android KeyStore)** for encrypted JWT token storage to ensure device-level security.
 * **Desktop (PyQt5)**: Built a lightweight native desktop client, packaged into a standalone `.exe` via PyInstaller.
+* **Web (React & Vite)**: Built a responsive dashboard utilizing **local Storage** for JWT token storage on Render Static Site.
+* **Mobile (React Native & Expo)**: Developed a cross-platform mobile app utilizing **Expo Secure Store (iOS Keychain / Android KeyStore)** for encrypted JWT token storage to ensure device-level security.
 
 ---
 ## Web version
