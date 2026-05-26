@@ -27,7 +27,7 @@ There are three version (Desktop, Web and Mobile) for users.
 
 ---
 
-## 🛠️ Tech Stack & Technical Highlights
+## Tech Stack & Technical Highlights
 ### Backend & Infrastructure
 * **Flask & Python**: Built a RESTful API backend serving three distinct client platforms.
 * **APScheduler & Automation**: Implemented a background cron-job running every 10 minutes to fetch live flight data via **RapidAPI**, drastically reducing manual tracking effort.
