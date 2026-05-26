@@ -37,7 +37,7 @@ There are three version (Desktop, Web and Mobile) for users.
 ### Frontend & Clients
 * **Desktop (PyQt5)**: Built a lightweight native desktop client, packaged into a standalone `.exe` via PyInstaller.
 * **Web (React & Vite)**: Built a responsive dashboard utilizing **local Storage** for JWT token storage on Render Static Site.
-* **Mobile (React Native & Expo)**: Developed a cross-platform mobile app utilizing **Expo Secure Store (iOS Keychain / Android KeyStore)** for encrypted JWT token storage to ensure device-level security.
+* **Mobile (React Native & Expo)**: Developed a cross-platform mobile app utilizing **Expo Secure Store (iOS Keychain / Android KeyStore)** for JWT token storage.
 
 ---
 ## Web version
