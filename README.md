@@ -66,6 +66,7 @@ https://flightticketwebproject.onrender.com/
 
 ### Desktop version
 
+https://github.com/CY-Marowak/FlightTicketProject
 
 ### Web version
 
