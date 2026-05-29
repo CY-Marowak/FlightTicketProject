@@ -29,7 +29,7 @@ __pycache__/
 *.sqlite
 *.sqlite3
 *.sqlite-journal
-.pyproj
+*.pyproj
 flights.db
 
 # === 🧰 Virtual Environments ===
