@@ -60,5 +60,5 @@ flight_gui.py
 ## Full System Architecture
 
 <a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg">
-  <img src="../diagram/Full%20System%20Architecture.svg" alt="Full System Architecture" width="80%">
+  <img src="https://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg" alt="Full System Architecture" width="80%">
 </a>
