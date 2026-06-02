@@ -58,6 +58,12 @@ flight_gui.py
 
 ---
 ## Full System Architecture
-<a href="https://viewer.diagrams.net/?lightbox=1&ui=dark&?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg">
+<a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg">
   <img src="diagram/Full%20System%20Architecture.svg" alt="Full System Architecture" width="100%">
+</a>
+
+<br>
+
+<a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/App%20flow.svg">
+  <img src="diagram/App%20flow.svg" alt="App flow" width="80%">
 </a>
