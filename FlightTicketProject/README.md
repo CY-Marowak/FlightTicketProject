@@ -57,15 +57,8 @@ flight_gui.py
 +提醒出現歷史最低價(socketio, user_push_token)
 
 ---
-## How it Works
-### App Flow:
-<a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/App%20flow.svg">
-  <img src="diagram/App%20flow.svg" alt="App flow" width="80%">
-</a>
-
----
-
 ## Full System Architecture
+
 <a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg">
-  <img src="diagram/Full%20System%20Architecture.svg" alt="Full System Architecture" width="60%">
+  <img src="../diagram/Full%20System%20Architecture.svg" alt="Full System Architecture" width="80%">
 </a>
