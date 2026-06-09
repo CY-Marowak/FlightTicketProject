@@ -4,9 +4,9 @@ An application that tracks the flight prices from time to time and notifies user
 There are three version (Desktop, Web and Mobile) for users.
 
 ## How it Works
-### App Flow:
-<a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/App%20flow.svg">
-  <img src="diagram/App%20flow.svg" alt="App flow" width="80%">
+### Basic User Flow:
+<a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Basic%20user%20flow.svg">
+  <img src="diagram/Basic%20user%20flow.svg" alt="Basic user flow" width="100%">
 </a>
 
 ---
