@@ -64,14 +64,14 @@ https://flightticketwebproject.onrender.com/
 
 ## Code
 
-### Desktop version
+### Backend & Desktop
 
 https://github.com/CY-Marowak/FlightTicketProject/tree/master/FlightTicketProject
 
-### Web version
+### Web
 
 https://github.com/CY-Marowak/FlightTicketWebProject
 
-### Mobile 
+### Mobile
 
 https://github.com/CY-Marowak/FlightTicketMobile
