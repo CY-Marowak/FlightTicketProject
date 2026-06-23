@@ -1,7 +1,7 @@
 # Flight Ticket Tracker
 
 An application that tracks the flight prices from time to time and notifies users when prices drop. <br>
-There are three version (Desktop, Web and Mobile) for users.
+There are three versions (Desktop, Web and Mobile) for users.
 
 ## How it Works
 ### Basic User Flow:
