@@ -57,13 +57,45 @@ flight_gui.py
 +提醒出現歷史最低價(socketio, user_push_token)
 
 ---
+## Overview
 ### App Flow:
 <a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/App%20flow.svg">
   <img src="https://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/App%20flow.svg" alt="App flow" width="100%">
 </a>
 
-## Full System Architecture
+### Full System Architecture
 
 <a href="https://viewer.diagrams.net/?target=blank&highlight=0000ff&edit=_blank&layers=1&nav=1#Uhttps://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg">
   <img src="https://github.com/CY-Marowak/FlightTicketProject/raw/refs/heads/master/diagram/Full%20System%20Architecture.svg" alt="Full System Architecture" width="80%">
 </a>
+
+---
+## Result
+<figure>
+  <figcaption>登入</figcaption>
+  <img src="./result/登入頁面.png" width="50%" alt="登入頁面">
+</figure>
+<figure>
+  <figcaption>查詢航班</figcaption>
+  <img src="./result/查詢航班2.png" width="50%" alt="查詢航班">
+</figure>
+<figure>
+  <figcaption>我的航班</figcaption>
+  <img src="./result/我的航班.png" width="50%" alt="我的航班">
+</figure>
+<figure>
+  <figcaption>價格趨勢</figcaption>
+  <img src="./result/價格折線圖.png" width="50%" alt="價格折線圖">
+</figure>
+<figure>
+  <figcaption>通知紀錄</figcaption>
+  <img src="./result/通知紀錄.png" width="50%" alt="通知紀錄">
+</figure>
+<figure>
+  <figcaption>個人資料</figcaption>
+  <img src="./result/個人資料.png" width="50%" alt="個人資料">
+</figure>
+<figure>
+  <figcaption>登出</figcaption>
+  <img src="./result/登出.png" width="50%" alt="登出">
+</figure>
