@@ -204,21 +204,6 @@ class FlightApp(QWidget):
 
         self.main_layout.addLayout(outer_layout)
 
-    # -------------------------------------------------
-    # Sign out UI
-    # -------------------------------------------------
-    def init_settings_tab(self):
-        layout = QVBoxLayout()
-
-        logout_btn = QPushButton("登出")
-        logout_btn.setStyleSheet("background-color: #d9534f; color: white; font-weight: bold;")
-        logout_btn.clicked.connect(self.logout)
-
-        layout.addWidget(logout_btn)
-        layout.addStretch()
-
-        self.settings_tab.setLayout(layout)
-
 
     # -------------------------------------------------
     # Attempt Login
@@ -370,11 +355,6 @@ class FlightApp(QWidget):
         self.profile_tab = QWidget() 
         self.tabs.addTab(self.profile_tab, "個人資料") 
         self.init_profile_tab() 
-        
-        # === 分頁6：設定 === 
-        self.settings_tab = QWidget() 
-        self.tabs.addTab(self.settings_tab, "設定") 
-        self.init_settings_tab()
 
 
     # -------------------------------------------------
@@ -890,6 +870,11 @@ class FlightApp(QWidget):
         change_btn.setStyleSheet("background-color: #0275d8; color: white; font-weight: bold;")
         change_btn.clicked.connect(self.open_change_pw)
         layout.addWidget(change_btn)
+
+        logout_btn = QPushButton("登出")
+        logout_btn.setStyleSheet("background-color: #d9534f; color: white; font-weight: bold;")
+        logout_btn.clicked.connect(self.logout)
+        layout.addWidget(logout_btn)
 
         layout.addStretch()
         self.profile_tab.setLayout(layout)
