@@ -95,7 +95,3 @@ flight_gui.py
   <figcaption>個人資料</figcaption>
   <img src="./result/個人資料.png" width="50%" alt="個人資料">
 </figure>
-<figure>
-  <figcaption>登出</figcaption>
-  <img src="./result/登出.png" width="50%" alt="登出">
-</figure>
